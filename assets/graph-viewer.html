@@ -231,21 +231,91 @@
     var currentGraph = null;
     var isGraphLoaded = false;
 
+    // Comprehensive color mapping based on test.json data
+    var colorMappings = {
+      matrix: {
+        // Matrix theme: Green variations with tech feel
+        'Project': '#00FF41',           // Bright green for projects
+        'project': '#00FF41',           // Same for lowercase
+        'Bug Fix': '#FF4444',           // Red for bug fixes
+        'Bug': '#FF6666',               // Lighter red for bugs
+        'Feature': '#00DD35',           // Green for features
+        'Component': '#00BB29',         // Darker green for components
+        'codebase_component': '#00BB29', // Same for codebase components
+        'Architecture': '#44FF44',      // Light green for architecture
+        'Infrastructure': '#00AA22',    // Infrastructure green
+        'Configuration': '#66FF66',     // Config green
+        'Environment': '#33DD33',       // Environment green
+        'Implementation': '#00CC30',    // Implementation green
+        'Strategy': '#FFAA00',          // Orange for strategy
+        'Decision': '#FF8800',          // Orange for decisions
+        'Process': '#AAFF00',           // Yellow-green for process
+        'Roadmap': '#FFFF00',           // Yellow for roadmap
+        'milestone': '#FFCC00',         // Gold for milestones
+        'Documentation': '#CCFFCC',     // Light green for docs
+        'Script': '#99FF99',            // Script green
+        'Resource': '#77FF77',          // Resource green
+        'Domain': '#55FF55',            // Domain green
+        'Cleanup': '#FF9900',           // Orange cleanup
+        'Development Phase': '#FFDD00', // Dev phase yellow
+        'deliverable_summary': '#AADD00', // Summary yellow-green
+        'default': '#00FF41'            // Default matrix green
+      },
+      regular: {
+        // Regular theme: Vibrant multicolored palette
+        'Project': '#3b82f6',           // Blue for projects
+        'project': '#3b82f6',           // Same for lowercase
+        'Bug Fix': '#ef4444',           // Red for bug fixes
+        'Bug': '#f87171',               // Lighter red for bugs
+        'Feature': '#10b981',           // Emerald for features
+        'Component': '#8b5cf6',         // Purple for components
+        'codebase_component': '#8b5cf6', // Same for codebase components
+        'Architecture': '#06b6d4',      // Cyan for architecture
+        'Infrastructure': '#64748b',    // Slate for infrastructure
+        'Configuration': '#84cc16',     // Lime for configuration
+        'Environment': '#22c55e',       // Green for environment
+        'Implementation': '#14b8a6',    // Teal for implementation
+        'Strategy': '#f59e0b',          // Amber for strategy
+        'Decision': '#f97316',          // Orange for decisions
+        'Process': '#ec4899',           // Pink for process
+        'Roadmap': '#eab308',           // Yellow for roadmap
+        'milestone': '#fbbf24',         // Gold for milestones
+        'Documentation': '#6366f1',     // Indigo for docs
+        'Script': '#a855f7',            // Violet for scripts
+        'Resource': '#06b6d4',          // Cyan for resources
+        'Domain': '#059669',            // Emerald for domain
+        'Cleanup': '#f97316',           // Orange cleanup
+        'Development Phase': '#d946ef', // Fuchsia dev phase
+        'deliverable_summary': '#8b5cf6', // Purple summary
+        'default': '#6b7280'            // Default gray
+      }
+    };
+
+    // Get color for node type based on current theme
+    function getNodeColor(nodeType, theme) {
+      var themeColors = colorMappings[theme] || colorMappings.regular;
+      return themeColors[nodeType] || themeColors.default;
+    }
+
     // Hardcoded test data
     var testGraphData = {
       nodes: [
-        { id: 'node1', name: 'Test Node 1', type: 'project', val: 10 },
-        { id: 'node2', name: 'Test Node 2', type: 'bug_fix', val: 8 },
-        { id: 'node3', name: 'Test Node 3', type: 'feature', val: 15 },
-        { id: 'node4', name: 'Test Node 4', type: 'component', val: 6 },
-        { id: 'node5', name: 'Test Node 5', type: 'roadmap', val: 12 }
+        { id: 'node1', name: 'Test Project', type: 'Project', val: 10 },
+        { id: 'node2', name: 'Bug Fix Issue', type: 'Bug Fix', val: 8 },
+        { id: 'node3', name: 'New Feature', type: 'Feature', val: 15 },
+        { id: 'node4', name: 'Core Component', type: 'Component', val: 6 },
+        { id: 'node5', name: 'System Architecture', type: 'Architecture', val: 12 },
+        { id: 'node6', name: 'Infrastructure Setup', type: 'Infrastructure', val: 9 },
+        { id: 'node7', name: 'Strategy Planning', type: 'Strategy', val: 11 }
       ],
       links: [
         { source: 'node1', target: 'node2' },
         { source: 'node1', target: 'node3' },
         { source: 'node2', target: 'node4' },
         { source: 'node3', target: 'node5' },
-        { source: 'node4', target: 'node5' }
+        { source: 'node4', target: 'node6' },
+        { source: 'node5', target: 'node7' },
+        { source: 'node6', target: 'node1' }
       ]
     };
 
@@ -313,6 +383,34 @@
         if (prompt) prompt.textContent = '>';
         logToExpo('🎨 Theme switched to MATRIX');
       }
+      
+      // Re-render graph with new theme colors if graph is loaded
+      if (isGraphLoaded && currentGraph) {
+        logToExpo('🔄 Updating graph colors for new theme...');
+        updateGraphColors();
+      }
+    }
+
+    // Update existing graph colors based on current theme
+    function updateGraphColors() {
+      if (!currentGraph) return;
+      
+      try {
+        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
+        
+        // Update graph colors
+        currentGraph
+          .backgroundColor(backgroundColor)
+          .nodeColor(function(node) {
+            return getNodeColor(node.type, currentTheme);
+          })
+          .linkColor(function() { return linkColor; });
+          
+        logToExpo('✅ Graph colors updated for ' + currentTheme + ' theme');
+      } catch (error) {
+        logToExpo('❌ Failed to update graph colors: ' + error.message, 'error');
+      }
     }
 
     // Command handling
@@ -328,10 +426,13 @@
         shutdownGraph();
       } else if (cmd === 'check-libs') {
         checkLibrariesStatus();
+      } else if (cmd === 'theme') {
+        switchTheme();
       } else if (cmd === 'help') {
         logToExpo('📖 Available commands:');
-        logToExpo('   • test - Create test graph');
-        logToExpo('   • init - Load external graph');
+        logToExpo('   • test - Create test graph with diverse node types');
+        logToExpo('   • init - Load external graph from test.json');
+        logToExpo('   • theme - Switch between Matrix/Regular themes');
         logToExpo('   • shutdown - Clear graph');
         logToExpo('   • check-libs - Check library status');
         logToExpo('   • help - Show this help');
@@ -340,6 +441,13 @@
       } else {
         logToExpo('❓ Unknown command: "' + command + '". Type "help" for available commands.');
       }
+    }
+
+    // Switch between themes
+    function switchTheme() {
+      var newTheme = currentTheme === 'matrix' ? 'regular' : 'matrix';
+      logToExpo('🔄 Switching from ' + currentTheme + ' to ' + newTheme + ' theme...');
+      applyTheme(newTheme);
     }
 
     function createTestGraph() {
@@ -355,28 +463,20 @@
         graphElement.innerHTML = '';
         
         // Apply theme colors
-        var nodeColors = currentTheme === 'matrix' 
-          ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
-          : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-        
-        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
         var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
         
         var Graph = window.ForceGraph3D()(graphElement)
           .graphData(testGraphData)
           .backgroundColor(backgroundColor)
-          .nodeAutoColorBy('type')
           .nodeColor(function(node) {
-            var colorIndex = Math.abs(node.id.split('').reduce(function(a, b) {
-              return a + b.charCodeAt(0);
-            }, 0)) % nodeColors.length;
-            return nodeColors[colorIndex];
+            return getNodeColor(node.type, currentTheme);
           })
           .linkColor(function() { return linkColor; })
           .nodeLabel('name')
           .linkLabel(function(link) { return link.source + ' → ' + link.target; })
           .onNodeClick(function(node) {
-            logToExpo('🖱️ Node clicked: ' + node.name);
+            logToExpo('🖱️ Node clicked: ' + node.name + ' (' + node.type + ')');
           })
           .enableNodeDrag(true)
           .onEngineStop(function() {
@@ -386,7 +486,7 @@
         currentGraph = Graph;
         isGraphLoaded = true;
         
-        logToExpo('✅ Test graph created successfully!');
+        logToExpo('✅ Test graph created with ' + currentTheme + ' theme colors!');
         logToExpo('🎮 Graph controls: drag to rotate, scroll to zoom, click nodes');
         
       } catch (error) {
@@ -550,12 +650,8 @@
         logToExpo('📊 Converted to graph format: ' + graphData.nodes.length + ' nodes, ' + graphData.links.length + ' links');
         
         // Apply theme colors
-        var nodeColors = theme === 'matrix' 
-          ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
-          : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-        
-        var linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
-        var backgroundColor = theme === 'matrix' ? '#000003' : '#f8fafc';
+        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
         
         // Clear and create graph
         var graphElement = document.getElementById('graph');
@@ -564,18 +660,14 @@
         var Graph = window.ForceGraph3D()(graphElement)
           .graphData(graphData)
           .backgroundColor(backgroundColor)
-          .nodeAutoColorBy('type')
           .nodeColor(function(node) {
-            var colorIndex = Math.abs(node.id.split('').reduce(function(a, b) {
-              return a + b.charCodeAt(0);
-            }, 0)) % nodeColors.length;
-            return nodeColors[colorIndex];
+            return getNodeColor(node.type, currentTheme);
           })
           .linkColor(function() { return linkColor; })
           .nodeLabel('name')
           .linkLabel(function(link) { return link.source + ' → ' + link.target; })
           .onNodeClick(function(node) {
-            logToExpo('🖱️ Node clicked: ' + node.name);
+            logToExpo('🖱️ Node clicked: ' + node.name + ' (' + node.type + ')');
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'nodeClicked',
@@ -592,7 +684,7 @@
         currentGraph = Graph;
         isGraphLoaded = true;
         
-        logToExpo('✅ External graph rendered successfully');
+        logToExpo('✅ External graph rendered with ' + currentTheme + ' theme colors!');
         
       } catch (error) {
         logToExpo('❌ External graph display error: ' + error.message, 'error');
@@ -601,8 +693,8 @@
 
     // Initialize everything when DOM is ready
     function initialize() {
-      logToExpo('🚀 Neron Graph Engine initialized');
-      logToExpo('💡 Commands: "test" for demo, "init" for external graph');
+      logToExpo('🚀 Neron Graph Engine initialized with multicolored themes');
+      logToExpo('💡 Commands: "test" for demo, "theme" to switch colors, "init" for external graph');
       
       // Apply initial Matrix theme
       applyTheme('matrix');
