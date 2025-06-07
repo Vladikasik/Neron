@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Neo4j Graph Visualization</title>
+  
   <style>
     body { 
       margin: 0; 
@@ -147,6 +148,10 @@
       background: #2563eb;
     }
   </style>
+
+  <!-- Correct 3D Force Graph script -->
+  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph@1.77.0/dist/3d-force-graph.min.js"></script>
 </head>
 <body>
   <div id="graph"></div>
@@ -157,255 +162,373 @@
     <div id="log-display"></div>
     <div id="input-area">
       <span id="input-prompt">></span>
-      <input type="text" id="command-input" placeholder="Type 'init' to load graph, 'SHUTDOWN' to clear..." />
+      <input type="text" id="command-input" placeholder="Type 'init' to load graph, 'test' for demo..." />
     </div>
   </div>
 
   <script>
     // Global state
-    let currentTheme = 'matrix';
-    let currentGraph = null;
-    let isGraphLoaded = false;
+    var currentTheme = 'matrix';
+    var currentGraph = null;
+    var isGraphLoaded = false;
 
-    // Console logging system
-    function addLog(message, type = 'info') {
-      const logDisplay = document.getElementById('log-display');
-      const timestamp = new Date().toLocaleTimeString();
-      const logEntry = document.createElement('div');
-      logEntry.className = 'log-entry';
-      logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
-      logDisplay.appendChild(logEntry);
-      logDisplay.scrollTop = logDisplay.scrollHeight;
+    // Hardcoded test data
+    var testGraphData = {
+      nodes: [
+        { id: 'node1', name: 'Test Node 1', type: 'project', val: 10 },
+        { id: 'node2', name: 'Test Node 2', type: 'bug_fix', val: 8 },
+        { id: 'node3', name: 'Test Node 3', type: 'feature', val: 15 },
+        { id: 'node4', name: 'Test Node 4', type: 'component', val: 6 },
+        { id: 'node5', name: 'Test Node 5', type: 'roadmap', val: 12 }
+      ],
+      links: [
+        { source: 'node1', target: 'node2' },
+        { source: 'node1', target: 'node3' },
+        { source: 'node2', target: 'node4' },
+        { source: 'node3', target: 'node5' },
+        { source: 'node4', target: 'node5' }
+      ]
+    };
+
+    // Logging function that sends to React Native console
+    function logToExpo(message, type) {
+      type = type || 'info';
+      var timestamp = new Date().toLocaleTimeString();
+      var logMessage = '[' + timestamp + '] ' + message;
       
-      // Keep max 100 entries
-      while (logDisplay.children.length > 100) {
-        logDisplay.removeChild(logDisplay.firstChild);
+      // Send to React Native console
+      if (window.ReactNativeWebView) {
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'log',
+            level: type,
+            message: logMessage
+          }));
+        } catch (e) {
+          console.error('Failed to send message to React Native:', e);
+        }
+      }
+      
+      // Add to in-app console for visual feedback
+      var logDisplay = document.getElementById('log-display');
+      if (logDisplay) {
+        var logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        logEntry.innerHTML = '<span class="log-timestamp">[' + timestamp + ']</span> ' + message;
+        logDisplay.appendChild(logEntry);
+        logDisplay.scrollTop = logDisplay.scrollHeight;
+        
+        // Keep max 50 entries for performance
+        while (logDisplay.children.length > 50) {
+          logDisplay.removeChild(logDisplay.firstChild);
+        }
       }
     }
 
-    // Initial log
-    addLog('🚀 Neron Graph Engine initialized');
-    addLog('💡 Commands: "init" to load graph, "SHUTDOWN" to clear');
-
-    // Error handling
-    window.addEventListener('error', function(e) {
-      addLog(`❌ Error: ${e.message}`, 'error');
-    });
+    // Check if libraries are loaded
+    function checkLibrariesStatus() {
+      var threeAvailable = typeof window.THREE !== 'undefined';
+      var forceGraphAvailable = typeof window.ForceGraph3D !== 'undefined';
+      
+      logToExpo((threeAvailable ? '✅' : '❌') + ' THREE.js: ' + (threeAvailable ? 'Available' : 'Missing'));
+      logToExpo((forceGraphAvailable ? '✅' : '❌') + ' ForceGraph3D: ' + (forceGraphAvailable ? 'Available' : 'Missing'));
+      
+      var allReady = threeAvailable && forceGraphAvailable;
+      logToExpo('📊 Libraries ready: ' + (allReady ? 'YES' : 'NO'));
+      
+      return allReady;
+    }
 
     // Theme management
     function applyTheme(theme) {
       currentTheme = theme;
-      const body = document.body;
-      const prompt = document.getElementById('input-prompt');
+      var body = document.body;
+      var prompt = document.getElementById('input-prompt');
       
       if (theme === 'regular') {
         body.classList.add('regular-theme');
-        prompt.textContent = '$';
-        addLog(`🎨 Theme switched to REGULAR`);
+        if (prompt) prompt.textContent = '$';
+        logToExpo('🎨 Theme switched to REGULAR');
       } else {
         body.classList.remove('regular-theme');
-        prompt.textContent = '>';
-        addLog(`🎨 Theme switched to MATRIX`);
+        if (prompt) prompt.textContent = '>';
+        logToExpo('🎨 Theme switched to MATRIX');
       }
-      
-      // Update graph colors if loaded
-      if (isGraphLoaded && currentGraph) {
-        updateGraphTheme(theme);
-      }
-    }
-
-    function updateGraphTheme(theme) {
-      if (!currentGraph) return;
-      
-      const nodeColors = theme === 'matrix' 
-        ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
-        : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-      
-      const linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
-      
-      addLog(`🎨 Updating graph colors for ${theme.toUpperCase()} theme`);
-      
-      // Note: Graph color updates would be applied here
-      // This is handled by the theme context in the main app
     }
 
     // Command handling
     function handleCommand(command) {
-      const cmd = command.trim().toLowerCase();
-      addLog(`> ${command}`);
+      var cmd = command.trim().toLowerCase();
+      logToExpo('> ' + command);
       
       if (cmd === 'init') {
-        if (isGraphLoaded) {
-          addLog('⚠️ Graph already loaded. Use "SHUTDOWN" first to clear.');
-          return;
-        }
-        loadGraph();
+        loadExternalGraph();
+      } else if (cmd === 'test') {
+        createTestGraph();
       } else if (cmd === 'shutdown') {
-        if (!isGraphLoaded) {
-          addLog('⚠️ No graph to shutdown.');
-          return;
-        }
         shutdownGraph();
+      } else if (cmd === 'check-libs') {
+        checkLibrariesStatus();
       } else if (cmd === 'help') {
-        addLog('📖 Available commands:');
-        addLog('   • init - Load graph from test.json');
-        addLog('   • SHUTDOWN - Clear current graph');
-        addLog('   • help - Show this help');
+        logToExpo('📖 Available commands:');
+        logToExpo('   • test - Create test graph');
+        logToExpo('   • init - Load external graph');
+        logToExpo('   • shutdown - Clear graph');
+        logToExpo('   • check-libs - Check library status');
+        logToExpo('   • help - Show this help');
       } else if (cmd === '') {
         // Do nothing for empty command
       } else {
-        addLog(`❓ Unknown command: "${command}". Type "help" for available commands.`);
+        logToExpo('❓ Unknown command: "' + command + '". Type "help" for available commands.');
       }
     }
 
-    function loadGraph() {
-      addLog('🔄 Loading graph data...');
+    function createTestGraph() {
+      logToExpo('🧪 Creating test graph with hardcoded data...');
+      
+      if (!checkLibrariesStatus()) {
+        logToExpo('❌ Cannot create graph - libraries not ready');
+        return;
+      }
+      
+      try {
+        var graphElement = document.getElementById('graph');
+        graphElement.innerHTML = '';
+        
+        // Apply theme colors
+        var nodeColors = currentTheme === 'matrix' 
+          ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
+          : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+        
+        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
+        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        
+        var Graph = window.ForceGraph3D()(graphElement)
+          .graphData(testGraphData)
+          .backgroundColor(backgroundColor)
+          .nodeAutoColorBy('type')
+          .nodeColor(function(node) {
+            var colorIndex = Math.abs(node.id.split('').reduce(function(a, b) {
+              return a + b.charCodeAt(0);
+            }, 0)) % nodeColors.length;
+            return nodeColors[colorIndex];
+          })
+          .linkColor(function() { return linkColor; })
+          .nodeLabel('name')
+          .linkLabel(function(link) { return link.source + ' → ' + link.target; })
+          .onNodeClick(function(node) {
+            logToExpo('🖱️ Node clicked: ' + node.name);
+          })
+          .enableNodeDrag(true)
+          .onEngineStop(function() {
+            logToExpo('🎯 Graph layout stabilized');
+          });
+        
+        currentGraph = Graph;
+        isGraphLoaded = true;
+        
+        logToExpo('✅ Test graph created successfully!');
+        logToExpo('🎮 Graph controls: drag to rotate, scroll to zoom, click nodes');
+        
+      } catch (error) {
+        logToExpo('❌ Test graph creation failed: ' + error.message, 'error');
+      }
+    }
+
+    function loadExternalGraph() {
+      logToExpo('🔄 Loading external graph data...');
+      
+      if (!checkLibrariesStatus()) {
+        logToExpo('❌ Cannot load graph - libraries not ready');
+        return;
+      }
       
       // Send message to React Native to get graph data
       if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'request_graph_data'
-        }));
+        try {
+          logToExpo('📡 Requesting graph data from React Native...');
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'request_graph_data'
+          }));
+        } catch (e) {
+          logToExpo('❌ Failed to request graph data: ' + e.message, 'error');
+        }
       } else {
-        addLog('❌ Cannot load graph: Not running in React Native WebView');
+        logToExpo('❌ Cannot load graph: Not running in React Native WebView');
       }
     }
 
     function shutdownGraph() {
-      addLog('🔄 Shutting down graph...');
-      
-      // Clear the graph
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'clear_graph'
-        }));
-      }
+      logToExpo('🔄 Shutting down graph...');
       
       currentGraph = null;
       isGraphLoaded = false;
       
       // Clear the graph display
-      const graphElement = document.getElementById('graph');
-      graphElement.innerHTML = '';
+      var graphElement = document.getElementById('graph');
+      if (graphElement) {
+        graphElement.innerHTML = '';
+      }
       
-      addLog('✅ Graph shutdown complete');
+      logToExpo('✅ Graph shutdown complete');
     }
 
     // Input handling
-    document.getElementById('command-input').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        const command = this.value;
-        if (command.trim()) {
-          handleCommand(command);
-          this.value = '';
-        }
+    function setupInputHandling() {
+      var commandInput = document.getElementById('command-input');
+      if (commandInput) {
+        commandInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            var command = this.value;
+            if (command.trim()) {
+              handleCommand(command);
+              this.value = '';
+            }
+          }
+        });
+        
+        // Blur input when clicking outside console
+        document.addEventListener('click', function(e) {
+          var console = document.getElementById('console');
+          if (console && !console.contains(e.target)) {
+            commandInput.blur();
+          }
+        });
+        
+        logToExpo('✅ Input handling setup complete');
+      } else {
+        logToExpo('❌ Could not find command input element');
       }
-    });
+    }
 
     // Message handling from React Native
     window.addEventListener('message', function(event) {
       try {
-        const message = JSON.parse(event.data);
+        var message = JSON.parse(event.data);
         
         if (message.type === 'updateTheme') {
           applyTheme(message.theme);
         } else if (message.type === 'loadGraphData') {
-          displayGraph(message.data, message.theme);
+          displayExternalGraph(message.data, message.theme);
         } else if (message.type === 'clearGraph') {
           shutdownGraph();
         }
       } catch (error) {
-        addLog(`❌ Message parsing error: ${error.message}`);
+        logToExpo('❌ Message parsing error: ' + error.message, 'error');
       }
     });
 
-    // Graph display function
-    function displayGraph(data, theme) {
-      addLog('🎯 Initializing 3D graph with Bloom effect...');
+    // Display external graph data
+    function displayExternalGraph(data, theme) {
+      logToExpo('🎯 Displaying external graph...');
+      logToExpo('📊 Entities: ' + data.entities.length + ', Relations: ' + data.relations.length);
+      
+      if (!checkLibrariesStatus()) {
+        logToExpo('❌ Libraries not ready for graph display');
+        return;
+      }
       
       try {
-        // Import Three.js and react-force-graph-3d
-        import('https://unpkg.com/react-force-graph-3d@1.25.4/dist/react-force-graph-3d.umd.js')
-          .then(() => import('https://unpkg.com/three@0.157.0/build/three.module.js'))
-          .then((THREE) => {
-            return import('https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/UnrealBloomPass.js');
+        // Convert entities/relations structure to nodes/links format
+        var nodes = data.entities.map(function(entity) {
+          return {
+            id: entity.id || entity.name,
+            name: entity.name,
+            type: entity.type,
+            val: entity.val || Math.min(entity.observations.length * 2 + 5, 20),
+            observations: entity.observations
+          };
+        });
+        
+        var links = data.relations.map(function(relation) {
+          return {
+            source: relation.source,
+            target: relation.target,
+            relationType: relation.relationType
+          };
+        });
+        
+        var graphData = { nodes: nodes, links: links };
+        
+        logToExpo('📊 Converted to graph format: ' + graphData.nodes.length + ' nodes, ' + graphData.links.length + ' links');
+        
+        // Apply theme colors
+        var nodeColors = theme === 'matrix' 
+          ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
+          : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+        
+        var linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
+        var backgroundColor = theme === 'matrix' ? '#000003' : '#f8fafc';
+        
+        // Clear and create graph
+        var graphElement = document.getElementById('graph');
+        graphElement.innerHTML = '';
+        
+        var Graph = window.ForceGraph3D()(graphElement)
+          .graphData(graphData)
+          .backgroundColor(backgroundColor)
+          .nodeAutoColorBy('type')
+          .nodeColor(function(node) {
+            var colorIndex = Math.abs(node.id.split('').reduce(function(a, b) {
+              return a + b.charCodeAt(0);
+            }, 0)) % nodeColors.length;
+            return nodeColors[colorIndex];
           })
-          .then((UnrealBloomModule) => {
-            const UnrealBloomPass = UnrealBloomModule.UnrealBloomPass;
-            
-            // Clear previous graph
-            const graphElement = document.getElementById('graph');
-            graphElement.innerHTML = '';
-            
-            // Create graph
-            const Graph = ForceGraph3D();
-            
-            // Apply theme colors
-            const nodeColors = theme === 'matrix' 
-              ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
-              : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-            
-            const linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
-            const backgroundColor = theme === 'matrix' ? '#000003' : '#f8fafc';
-            
-            Graph(graphElement)
-              .graphData(data)
-              .backgroundColor(backgroundColor)
-              .nodeAutoColorBy('type')
-              .nodeColor(node => {
-                const colorIndex = Math.abs(node.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % nodeColors.length;
-                return nodeColors[colorIndex];
-              })
-              .linkColor(() => linkColor)
-              .nodeLabel('name')
-              .linkLabel(link => `${link.source} → ${link.target}`)
-              .onNodeClick(node => {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'nodeClicked',
-                    node: node,
-                    allData: data
-                  }));
-                }
-              })
-              .enableNodeDrag(true)
-              .onEngineStop(() => {
-                addLog('🎯 Graph layout stabilized');
-                
-                // Add Bloom Post-Processing Effect - EXACT OFFICIAL IMPLEMENTATION
-                const bloomPass = new UnrealBloomPass();
-                bloomPass.strength = 4;  // Exact values from Vasturiano example
-                bloomPass.radius = 1;
-                bloomPass.threshold = 0;
-                
-                try {
-                  Graph.postProcessingComposer().addPass(bloomPass);
-                  addLog('✨ Bloom effect applied successfully');
-                } catch (bloomError) {
-                  addLog(`⚠️ Bloom effect warning: ${bloomError.message}`);
-                }
-              });
-            
-            currentGraph = Graph;
-            isGraphLoaded = true;
-            
-            addLog(`✅ Graph loaded: ${data.entities.length} entities, ${data.relations.length} relations`);
-            addLog('🎮 Graph controls: drag to rotate, scroll to zoom, click nodes for details');
-            
+          .linkColor(function() { return linkColor; })
+          .nodeLabel('name')
+          .linkLabel(function(link) { return link.source + ' → ' + link.target; })
+          .onNodeClick(function(node) {
+            logToExpo('🖱️ Node clicked: ' + node.name);
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'nodeClicked',
+                node: node,
+                allData: data
+              }));
+            }
           })
-          .catch(error => {
-            addLog(`❌ Graph loading error: ${error.message}`);
-            console.error('Graph loading error:', error);
+          .enableNodeDrag(true)
+          .onEngineStop(function() {
+            logToExpo('🎯 Graph layout stabilized');
           });
-          
+        
+        currentGraph = Graph;
+        isGraphLoaded = true;
+        
+        logToExpo('✅ External graph rendered successfully');
+        
       } catch (error) {
-        addLog(`❌ Graph initialization error: ${error.message}`);
-        console.error('Graph initialization error:', error);
+        logToExpo('❌ External graph display error: ' + error.message, 'error');
       }
     }
 
-    // Apply initial Matrix theme
-    applyTheme('matrix');
+    // Initialize everything when DOM is ready
+    function initialize() {
+      logToExpo('🚀 Neron Graph Engine initialized');
+      logToExpo('💡 Commands: "test" for demo, "init" for external graph');
+      
+      // Apply initial Matrix theme
+      applyTheme('matrix');
+      
+      // Setup input handling
+      setupInputHandling();
+      
+      // Check libraries after a short delay
+      setTimeout(function() {
+        checkLibrariesStatus();
+      }, 500);
+    }
+
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+      initialize();
+    }
+
+    // Test script execution
+    logToExpo('🔥 Script loaded successfully!');
   </script>
 </body>
 </html> 

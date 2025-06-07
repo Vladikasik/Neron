@@ -28,11 +28,14 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
   useEffect(() => {
     const getAssetUri = async () => {
       try {
+        console.log('🌐 REACT NATIVE: Loading graph-viewer.html asset...');
         const asset = Asset.fromModule(require('../../assets/graph-viewer.html'));
         await asset.downloadAsync();
-        setWebViewUrl(asset.localUri || asset.uri);
+        const uri = asset.localUri || asset.uri;
+        console.log('🌐 REACT NATIVE: HTML asset loaded successfully:', uri);
+        setWebViewUrl(uri);
       } catch (error) {
-        console.error('Error loading HTML asset:', error);
+        console.error('🌐 REACT NATIVE ERROR: Failed to load HTML asset:', error);
         Alert.alert('Error', 'Failed to load graph viewer');
       }
     };
@@ -47,6 +50,8 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         type: 'updateTheme',
         theme: theme.type
       };
+      
+      console.log(`🌐 REACT NATIVE: Theme changed, sending to WebView: ${theme.type}`);
       
       setTimeout(() => {
         webViewRef.current?.postMessage(JSON.stringify(message));
@@ -79,7 +84,28 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
       const message = JSON.parse(event.nativeEvent.data);
       
       switch (message.type) {
+        case 'log':
+          // Handle logging messages from WebView and display in Mac terminal console
+          const logMessage = message.message || 'Unknown log message';
+          const logLevel = message.level || 'info';
+          
+          // Output to Mac terminal console where npm start ios is running
+          if (logLevel === 'error') {
+            console.error(`🌐 WEBVIEW ERROR: ${logMessage}`);
+          } else if (logLevel === 'warn') {
+            console.warn(`🌐 WEBVIEW WARN: ${logMessage}`);
+          } else {
+            console.log(`🌐 WEBVIEW: ${logMessage}`);
+          }
+          
+          // Also use React Native's console for additional visibility
+          if (__DEV__) {
+            console.log(`[NERON WEBVIEW] ${logMessage}`);
+          }
+          break;
+
         case 'request_graph_data':
+          console.log('🌐 WEBVIEW: Requesting graph data...');
           // Send graph data when WebView requests it via "init" command
           const transformedData = transformDataForGraph(data);
           const loadMessage = {
@@ -88,6 +114,8 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
             theme: theme.type
           };
           
+          console.log(`🌐 WEBVIEW: Sending graph data - ${transformedData.entities.length} entities, ${transformedData.relations.length} relations`);
+          
           setTimeout(() => {
             webViewRef.current?.postMessage(JSON.stringify(loadMessage));
           }, 100);
@@ -95,10 +123,11 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
 
         case 'clear_graph':
           // Handle graph clearing via "SHUTDOWN" command
-          console.log('Graph cleared via WebView command');
+          console.log('🌐 WEBVIEW: Graph cleared via SHUTDOWN command');
           break;
 
         case 'nodeClicked':
+          console.log(`🌐 WEBVIEW: Node clicked - ${message.node?.name || 'Unknown node'}`);
           // Handle node clicks
           if (message.node && navigation) {
             const nodeData = {
@@ -122,21 +151,18 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
           }
           break;
 
-        case 'log':
-          // Handle console logs from WebView (optional for debugging)
-          console.log('WebView log:', message.message);
-          break;
-
         default:
-          console.log('Unknown WebView message type:', message.type);
+          console.log(`🌐 WEBVIEW: Unknown message type: ${message.type}`, message);
       }
     } catch (error) {
-      console.error('Error parsing WebView message:', error);
+      console.error('🌐 WEBVIEW ERROR: Failed to parse message:', error);
+      console.error('🌐 WEBVIEW ERROR: Raw message data:', event.nativeEvent.data);
     }
   };
 
   // Handle WebView load completion
   const handleWebViewLoad = () => {
+    console.log('🌐 REACT NATIVE: WebView loaded successfully');
     setIsLoading(false);
     
     // Send initial theme after WebView loads
@@ -145,13 +171,17 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         type: 'updateTheme',
         theme: theme.type
       };
+      console.log(`🌐 REACT NATIVE: Sending initial theme: ${theme.type}`);
       webViewRef.current?.postMessage(JSON.stringify(themeMessage));
     }, 500);
   };
 
   const handleWebViewError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
-    console.error('WebView error:', nativeEvent);
+    console.error('🌐 REACT NATIVE ERROR: WebView failed to load');
+    console.error('🌐 REACT NATIVE ERROR: Error details:', nativeEvent);
+    console.error('🌐 REACT NATIVE ERROR: URL:', nativeEvent.url);
+    console.error('🌐 REACT NATIVE ERROR: Description:', nativeEvent.description);
     setIsLoading(false);
     Alert.alert('Error', 'Failed to load graph visualization');
   };
