@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NeronGraphViz",
-    "slug": "neron-graph-viz",
+    "slug": "neron",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,6 +28,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2e768781-be32-433a-bd53-86d13e05ad53"
+      }
+    },
+    "owner": "ainshtein"
   }
 }
