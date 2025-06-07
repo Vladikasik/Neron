@@ -37,6 +37,50 @@
       z-index: 1000;
       display: flex;
       flex-direction: column;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    #console.hidden {
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Console toggle button */
+    #console-toggle {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #00FF41;
+      border-radius: 50%;
+      color: #00FF41;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+
+    #console-toggle:hover {
+      background: rgba(0, 255, 65, 0.1);
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+      transform: scale(1.1);
+    }
+
+    #console-toggle.console-hidden {
+      right: 15px;
+    }
+
+    #console-toggle.console-visible {
+      right: 375px;
     }
 
     #console-header {
@@ -147,6 +191,18 @@
     .regular-theme #log-display::-webkit-scrollbar-thumb {
       background: #2563eb;
     }
+
+    /* Regular theme styling for toggle button */
+    .regular-theme #console-toggle {
+      border-color: #2563eb;
+      color: #1e40af;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .regular-theme #console-toggle:hover {
+      background: rgba(37, 99, 235, 0.1);
+      box-shadow: 0 0 15px rgba(37, 99, 235, 0.5);
+    }
   </style>
 
   <!-- Correct 3D Force Graph script -->
@@ -155,6 +211,9 @@
 </head>
 <body>
   <div id="graph"></div>
+  
+  <!-- Console toggle button -->
+  <button id="console-toggle" class="console-visible" title="Toggle Console">⚡</button>
   
   <!-- Top-right console -->
   <div id="console">
@@ -402,6 +461,43 @@
       }
     }
 
+    // Console toggle functionality
+    function setupConsoleToggle() {
+      var toggleButton = document.getElementById('console-toggle');
+      var console = document.getElementById('console');
+      var isConsoleVisible = true;
+
+      if (toggleButton && console) {
+        toggleButton.addEventListener('click', function(e) {
+          e.stopPropagation();
+          
+          if (isConsoleVisible) {
+            // Hide console
+            console.classList.add('hidden');
+            toggleButton.classList.remove('console-visible');
+            toggleButton.classList.add('console-hidden');
+            toggleButton.innerHTML = '👁️';
+            toggleButton.title = 'Show Console';
+            isConsoleVisible = false;
+            logToExpo('🙈 Console hidden');
+          } else {
+            // Show console
+            console.classList.remove('hidden');
+            toggleButton.classList.remove('console-hidden');
+            toggleButton.classList.add('console-visible');
+            toggleButton.innerHTML = '⚡';
+            toggleButton.title = 'Hide Console';
+            isConsoleVisible = true;
+            logToExpo('👁️ Console visible');
+          }
+        });
+        
+        logToExpo('✅ Console toggle setup complete');
+      } else {
+        logToExpo('❌ Could not find console toggle elements');
+      }
+    }
+
     // Message handling from React Native
     window.addEventListener('message', function(event) {
       try {
@@ -513,6 +609,9 @@
       
       // Setup input handling
       setupInputHandling();
+      
+      // Setup console toggle
+      setupConsoleToggle();
       
       // Check libraries after a short delay
       setTimeout(function() {
