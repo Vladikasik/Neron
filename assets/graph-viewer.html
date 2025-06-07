@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Neo4j Graph Visualization</title>
+  <style>
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: #000003;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #graph { 
+      width: 100vw; 
+      height: 100vh; 
+    }
+
+    /* Console toggle button */
+    #console-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #00FF41;
+      border-radius: 50%;
+      color: #00FF41;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      transition: all 0.3s ease;
+    }
+
+    #console-toggle:hover {
+      background: rgba(0, 255, 65, 0.1);
+    }
+
+    /* Smaller console styling */
+    #console {
+      position: fixed;
+      top: 60px;
+      right: 10px;
+      width: 280px;
+      height: 200px;
+      background: rgba(0, 0, 0, 0.95);
+      border: 1px solid #00FF41;
+      border-radius: 5px;
+      padding: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #00FF41;
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+      backdrop-filter: blur(5px);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s ease;
+    }
+
+    #console.hidden {
+      opacity: 0;
+      transform: translateX(100%);
+      pointer-events: none;
+    }
+
+    #console-header {
+      color: #00FF41;
+      border-bottom: 1px solid #00FF41;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 9px;
+    }
+
+    #log-display {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 9px;
+      line-height: 1.1;
+      padding-right: 3px;
+    }
+
+    #log-display::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    #log-display::-webkit-scrollbar-track {
+      background: rgba(0, 255, 65, 0.1);
+    }
+
+    #log-display::-webkit-scrollbar-thumb {
+      background: #00FF41;
+      border-radius: 2px;
+    }
+
+    .log-entry {
+      margin-bottom: 1px;
+      opacity: 0.9;
+      word-wrap: break-word;
+    }
+
+    .log-timestamp {
+      color: #00BB29;
+      font-size: 8px;
+    }
+
+    #input-area {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      border-top: 1px solid #00FF41;
+      padding-top: 4px;
+    }
+
+    #input-prompt {
+      color: #00FF41;
+      margin-right: 4px;
+      font-weight: bold;
+      font-size: 10px;
+    }
+
+    #command-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #00FF41;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      outline: none;
+    }
+
+    #command-input::placeholder {
+      color: rgba(0, 255, 65, 0.5);
+    }
+
+    /* Theme-aware styling for regular theme */
+    .regular-theme #console-toggle {
+      border-color: #2563eb;
+      color: #3b82f6;
+    }
+
+    .regular-theme #console-toggle:hover {
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .regular-theme #console {
+      background: rgba(0, 0, 0, 0.95);
+      border-color: #2563eb;
+      color: #3b82f6;
+      box-shadow: 0 0 15px rgba(37, 99, 235, 0.3);
+    }
+
+    .regular-theme #console-header {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+
+    .regular-theme .log-entry {
+      color: #94a3b8;
+    }
+
+    .regular-theme .log-timestamp {
+      color: #64748b;
+    }
+
+    .regular-theme #input-prompt {
+      color: #2563eb;
+    }
+
+    .regular-theme #command-input {
+      color: #3b82f6;
+    }
+
+    .regular-theme #command-input::placeholder {
+      color: rgba(59, 130, 246, 0.5);
+    }
+
+    .regular-theme #log-display::-webkit-scrollbar-track {
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .regular-theme #log-display::-webkit-scrollbar-thumb {
+      background: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div id="graph"></div>
+  
+  <!-- Console toggle button -->
+  <div id="console-toggle" onclick="toggleConsole()">⚡</div>
+  
+  <!-- Smaller console -->
+  <div id="console">
+    <div id="console-header">⚡ CONSOLE</div>
+    <div id="log-display"></div>
+    <div id="input-area">
+      <span id="input-prompt">></span>
+      <input type="text" id="command-input" placeholder="init / SHUTDOWN / help" />
+    </div>
+  </div>
+
+  <!-- Load libraries in correct order -->
+  <script crossorigin src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://unpkg.com/react-force-graph-3d@1.25.4/dist/react-force-graph-3d.umd.js"></script>
+
+  <script>
+    // Global state
+    let currentTheme = 'matrix';
+    let currentGraph = null;
+    let isGraphLoaded = false;
+    let consoleVisible = true;
+
+    // Console toggle functionality
+    function toggleConsole() {
+      const console = document.getElementById('console');
+      const toggleBtn = document.getElementById('console-toggle');
+      
+      consoleVisible = !consoleVisible;
+      
+      if (consoleVisible) {
+        console.classList.remove('hidden');
+        toggleBtn.innerHTML = '⚡';
+        addLog('📺 Console shown');
+      } else {
+        console.classList.add('hidden');
+        toggleBtn.innerHTML = '👁️';
+      }
+    }
+
+    // Console logging system
+    function addLog(message, type = 'info') {
+      const logDisplay = document.getElementById('log-display');
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+      logDisplay.appendChild(logEntry);
+      logDisplay.scrollTop = logDisplay.scrollHeight;
+      
+      // Keep max 50 entries for smaller console
+      while (logDisplay.children.length > 50) {
+        logDisplay.removeChild(logDisplay.firstChild);
+      }
+    }
+
+    // Wait for libraries to load
+    function waitForLibraries() {
+      return new Promise((resolve) => {
+        const checkLibraries = () => {
+          if (window.THREE && window.ForceGraph3D && window.THREE.UnrealBloomPass) {
+            addLog('✅ All libraries loaded successfully');
+            resolve();
+          } else {
+            addLog('⏳ Loading libraries...');
+            setTimeout(checkLibraries, 500);
+          }
+        };
+        checkLibraries();
+      });
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', async function() {
+      addLog('🚀 Neron Graph Engine initializing...');
+      
+      try {
+        await waitForLibraries();
+        addLog('💡 Commands: "init" to load graph, "SHUTDOWN" to clear');
+        addLog('👁️ Click ⚡ button to hide/show console');
+      } catch (error) {
+        addLog(`❌ Initialization error: ${error.message}`);
+      }
+    });
+
+    // Error handling
+    window.addEventListener('error', function(e) {
+      addLog(`❌ Error: ${e.message}`, 'error');
+    });
+
+    // Theme management
+    function applyTheme(theme) {
+      currentTheme = theme;
+      const body = document.body;
+      const prompt = document.getElementById('input-prompt');
+      
+      if (theme === 'regular') {
+        body.classList.add('regular-theme');
+        prompt.textContent = '$';
+        addLog(`🎨 Theme: REGULAR`);
+      } else {
+        body.classList.remove('regular-theme');
+        prompt.textContent = '>';
+        addLog(`🎨 Theme: MATRIX`);
+      }
+      
+      // Update graph colors if loaded
+      if (isGraphLoaded && currentGraph) {
+        updateGraphTheme(theme);
+      }
+    }
+
+    function updateGraphTheme(theme) {
+      if (!currentGraph) return;
+      
+      const nodeColors = theme === 'matrix' 
+        ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
+        : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+      
+      const linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
+      
+      try {
+        currentGraph
+          .nodeColor(node => {
+            const colorIndex = Math.abs(node.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % nodeColors.length;
+            return nodeColors[colorIndex];
+          })
+          .linkColor(() => linkColor);
+        addLog(`✅ Colors updated: ${theme.toUpperCase()}`);
+      } catch (error) {
+        addLog(`⚠️ Theme update warning: ${error.message}`);
+      }
+    }
+
+    // Command handling
+    function handleCommand(command) {
+      const cmd = command.trim().toLowerCase();
+      addLog(`> ${command}`);
+      
+      if (cmd === 'init') {
+        if (isGraphLoaded) {
+          addLog('⚠️ Graph loaded. Use SHUTDOWN first.');
+          return;
+        }
+        loadGraph();
+      } else if (cmd === 'shutdown') {
+        if (!isGraphLoaded) {
+          addLog('⚠️ No graph to shutdown.');
+          return;
+        }
+        shutdownGraph();
+      } else if (cmd === 'help') {
+        addLog('📖 Commands:');
+        addLog('  • init - Load graph');
+        addLog('  • SHUTDOWN - Clear graph');
+        addLog('  • help - Show help');
+      } else if (cmd === 'hide') {
+        if (consoleVisible) toggleConsole();
+      } else if (cmd === 'show') {
+        if (!consoleVisible) toggleConsole();
+      } else if (cmd === '') {
+        // Do nothing for empty command
+      } else {
+        addLog(`❓ Unknown: "${command}". Try "help"`);
+      }
+    }
+
+    function loadGraph() {
+      addLog('🔄 Loading graph data...');
+      
+      // Send message to React Native to get graph data
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'request_graph_data'
+        }));
+      } else {
+        addLog('❌ Not in React Native WebView');
+      }
+    }
+
+    function shutdownGraph() {
+      addLog('🔄 Shutting down...');
+      
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'clear_graph'
+        }));
+      }
+      
+      currentGraph = null;
+      isGraphLoaded = false;
+      
+      const graphElement = document.getElementById('graph');
+      graphElement.innerHTML = '';
+      
+      addLog('✅ Graph cleared');
+    }
+
+    // Input handling
+    document.getElementById('command-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        const command = this.value;
+        if (command.trim()) {
+          handleCommand(command);
+          this.value = '';
+        }
+      }
+    });
+
+    // Message handling from React Native
+    window.addEventListener('message', function(event) {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'updateTheme') {
+          applyTheme(message.theme);
+        } else if (message.type === 'loadGraphData') {
+          displayGraph(message.data, message.theme);
+        } else if (message.type === 'clearGraph') {
+          shutdownGraph();
+        }
+      } catch (error) {
+        addLog(`❌ Message error: ${error.message}`);
+      }
+    });
+
+    // Graph display function
+    function displayGraph(data, theme) {
+      addLog('🎯 Creating 3D graph...');
+      
+      try {
+        // Check if libraries are loaded
+        if (!window.THREE || !window.ForceGraph3D) {
+          addLog('❌ Libraries not ready');
+          setTimeout(() => displayGraph(data, theme), 1000);
+          return;
+        }
+
+        // Clear previous graph
+        const graphElement = document.getElementById('graph');
+        graphElement.innerHTML = '';
+        
+        // Create graph using UMD global
+        const Graph = ForceGraph3D();
+        
+        // Apply theme colors
+        const nodeColors = theme === 'matrix' 
+          ? ['#00FF41', '#00DD35', '#00BB29', '#00991D', '#007711']
+          : ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+        
+        const linkColor = theme === 'matrix' ? '#004d1a' : '#64748b';
+        const backgroundColor = theme === 'matrix' ? '#000003' : '#f8fafc';
+        
+        Graph(graphElement)
+          .graphData(data)
+          .backgroundColor(backgroundColor)
+          .nodeAutoColorBy('type')
+          .nodeColor(node => {
+            const colorIndex = Math.abs(node.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % nodeColors.length;
+            return nodeColors[colorIndex];
+          })
+          .linkColor(() => linkColor)
+          .nodeLabel('name')
+          .linkLabel(link => `${link.source} → ${link.target}`)
+          .onNodeClick(node => {
+            addLog(`🎯 Node: ${node.name}`);
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'nodeClicked',
+                node: node,
+                allData: data
+              }));
+            }
+          })
+          .enableNodeDrag(true)
+          .onEngineStop(() => {
+            addLog('🎯 Layout complete');
+            
+            // Add Bloom Effect if available
+            try {
+              if (window.THREE.UnrealBloomPass) {
+                const bloomPass = new THREE.UnrealBloomPass();
+                bloomPass.strength = 4;
+                bloomPass.radius = 1;
+                bloomPass.threshold = 0;
+                
+                Graph.postProcessingComposer().addPass(bloomPass);
+                addLog('✨ Bloom effect active');
+              } else {
+                addLog('⚠️ Bloom effect not available');
+              }
+            } catch (bloomError) {
+              addLog(`⚠️ Bloom error: ${bloomError.message}`);
+            }
+          });
+        
+        currentGraph = Graph;
+        isGraphLoaded = true;
+        
+        addLog(`✅ Loaded: ${data.entities.length} nodes, ${data.relations.length} links`);
+        addLog('🎮 Drag to rotate, scroll to zoom');
+        
+      } catch (error) {
+        addLog(`❌ Graph error: ${error.message}`);
+        console.error('Graph initialization error:', error);
+      }
+    }
+
+    // Apply initial Matrix theme
+    applyTheme('matrix');
+  </script>
+</body>
+</html> 

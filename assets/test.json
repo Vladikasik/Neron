@@ -1,0 +1,681 @@
+{
+    "entities": [
+      {
+        "name": "current-mcp-servers",
+        "type": "codebase_component",
+        "observations": [
+          "Three existing servers: mcp-neo4j-memory, mcp-neo4j-cypher, mcp-neo4j-cloud-aura-api",
+          "Built with official MCP Python SDK",
+          "Uses stdio transport (subprocess-based)",
+          "Production-ready with proper error handling and logging"
+        ]
+      },
+      {
+        "name": "MCP Neo4j HTTPS Bridge Project",
+        "type": "Project",
+        "observations": [
+          "Has deprecation warning with sse_app() method in main.py line 327",
+          "Uses FastMCP for HTTPS bridge functionality",
+          "Duplicates functionality already available in servers/mcp-neo4j-memory/",
+          "Current architecture: Custom HTTPS bridge vs Standard MCP stdio server",
+          "User wants to store project data and roadmap in Neo4j knowledge graph",
+          "Successfully replaced main.py with production-ready MCP Neo4j memory server",
+          "Eliminated deprecation warning by removing FastMCP sse_app() usage",
+          "Switched to standard MCP server pattern using stdio transport",
+          "Added proper error handling and logging",
+          "Implemented fulltext search capabilities with Neo4j index",
+          "Updated requirements.txt to remove FastMCP/uvicorn dependencies and add proper MCP dependencies",
+          "✅ TESTING SUCCESSFUL: Server starts without deprecation warnings",
+          "✅ Neo4j connection established to neo4j+s://50a6a485.databases.neo4j.io",
+          "✅ Fulltext index created/verified successfully",
+          "✅ MCP server running on stdio transport as expected",
+          "✅ Fixed pydantic Settings validation issues with model_config extra='ignore'",
+          "✅ Virtual environment (.venv) working correctly with all dependencies"
+        ]
+      },
+      {
+        "name": "MCP Server Architecture Decision",
+        "type": "Decision",
+        "observations": [
+          "Option 1: Fix deprecation warning by replacing sse_app() with http_app() or create_sse_app()",
+          "Option 2: Replace main.py with existing MCP Neo4j memory server (recommended)",
+          "Existing server has better structure, error handling, and follows MCP patterns",
+          "Existing server uses stdio transport vs HTTPS in current main.py",
+          "Need to maintain HTTPS capability for production deployment",
+          "DECISION IMPLEMENTED: Replaced main.py with existing MCP Neo4j memory server architecture",
+          "Removed duplicated functionality and consolidated to single well-structured server",
+          "Maintained environment-based configuration for Neo4j connection",
+          "Server now uses stdio transport (standard MCP pattern) instead of HTTPS bridge",
+          "All Neo4j operations now use proper async patterns and connection pooling"
+        ]
+      },
+      {
+        "name": "Neo4j MCP SSE Bridge",
+        "type": "Project",
+        "observations": [
+          "Production-ready SSE bridge for MCP with Neo4j",
+          "Single entry point serving all MCP functionality over HTTPS",
+          "SSL/TLS encrypted communication",
+          "Uses FastMCP for SSE implementation",
+          "Connects to Neo4j Aura cloud database",
+          "Project revision completed successfully",
+          "Clean minimal structure achieved",
+          "All unnecessary files removed",
+          "Production-ready SSE bridge created",
+          "STDIO servers preserved in servers/ directory",
+          "SSL configuration ready for deployment",
+          "Knowledge graph tracking implemented",
+          "SSL certificate error fixed",
+          "HTTP fallback implemented for development",
+          "Server successfully starts on port 8000 without SSL",
+          "Production SSL support maintained",
+          "Configured for production deployment at memory.aynshteyn.dev/mcp",
+          "HTTP proxy server removed and consolidated",
+          "SSE transport properly configured with /mcp path",
+          "SSL certificates integrated for HTTPS production deployment",
+          "Development and production environments properly separated",
+          "SSL configuration error resolved with custom uvicorn setup",
+          "FastMCP SSE transport limitations addressed",
+          "Production HTTPS deployment ready",
+          "Custom FastAPI app for proper path mounting",
+          "SSL certificate validation and automatic fallback implemented"
+        ]
+      },
+      {
+        "name": "Production SSL Setup",
+        "type": "Infrastructure",
+        "observations": [
+          "Custom uvicorn.Config with SSL parameters",
+          "FastAPI app mounting for path configuration",
+          "SSL certificate file validation",
+          "Automatic HTTP fallback for development",
+          "Production-ready HTTPS on port 443"
+        ]
+      },
+      {
+        "name": "SSL Configuration Fix",
+        "type": "Bug Fix",
+        "observations": [
+          "Fixed TypeError: FastMCP.run_http_async() got unexpected keyword argument 'ssl_keyfile'",
+          "FastMCP SSE transport doesn't accept SSL parameters directly",
+          "Created custom uvicorn configuration for SSL support",
+          "Added FastAPI app mounting for proper /mcp path handling",
+          "SSL certificates now properly validated and configured"
+        ]
+      },
+      {
+        "name": "Production Architecture",
+        "type": "Architecture",
+        "observations": [
+          "Single main.py entry point",
+          "Environment-based configuration",
+          "SSL certificate management",
+          "Uvicorn ASGI server",
+          "Preserved STDIO servers in servers/ directory",
+          "Environment-aware SSL configuration",
+          "Automatic port adjustment (443->8000 for HTTP)",
+          "Path validation for SSL certificates",
+          "Graceful error handling implemented",
+          "Domain-specific configuration implemented",
+          "SSL certificate path validation added",
+          "Environment-aware transport selection",
+          "Production URL structure: https://memory.aynshteyn.dev/mcp",
+          "Simplified architecture with single entry point"
+        ]
+      },
+      {
+        "name": "HTTP Proxy Removal",
+        "type": "Cleanup",
+        "observations": [
+          "Removed servers/mcp-neo4j-http-proxy directory",
+          "Consolidated functionality into main.py",
+          "Eliminated redundant HTTP proxy layer",
+          "Simplified deployment architecture",
+          "Reduced maintenance overhead"
+        ]
+      },
+      {
+        "name": "Production Domain Configuration",
+        "type": "Configuration",
+        "observations": [
+          "Configured for https://memory.aynshteyn.dev/mcp",
+          "SSE transport on /mcp path",
+          "SSL certificates for production HTTPS",
+          "HTTP fallback for development on port 8000",
+          "Environment-based SSL detection"
+        ]
+      },
+      {
+        "name": "Development vs Production",
+        "type": "Environment",
+        "observations": [
+          "Development runs on HTTP port 8000",
+          "Production requires SSL certificates on port 443",
+          "Environment detection based on certificate availability",
+          "Graceful fallback for local development"
+        ]
+      },
+      {
+        "name": "SSL Certificate Error",
+        "type": "Bug",
+        "observations": [
+          "FileNotFoundError when loading SSL certificates",
+          "SSL cert paths in .env were for Linux production server",
+          "Local macOS development environment lacks SSL certificates",
+          "Fixed by making SSL optional with HTTP fallback"
+        ]
+      },
+      {
+        "name": "Project Cleanup Strategy",
+        "type": "Strategy",
+        "observations": [
+          "Removed unnecessary configuration files",
+          "Minimal production-ready structure",
+          "Focus on essential functionality only",
+          "Clean separation of concerns",
+          "Maintained backward compatibility with STDIO servers"
+        ]
+      },
+      {
+        "name": "SSE Bridge Implementation",
+        "type": "Implementation",
+        "observations": [
+          "FastMCP framework for SSE communication",
+          "Real-time bidirectional communication",
+          "Tool-based interface for MCP clients",
+          "Secure HTTPS endpoints",
+          "Production logging and error handling"
+        ]
+      },
+      {
+        "name": "Knowledge Graph Management",
+        "type": "Feature",
+        "observations": [
+          "Create, read, update, delete entities and relationships",
+          "Entity management with types and observations",
+          "Relationship creation using active voice",
+          "Bulk operations for efficiency"
+        ]
+      },
+      {
+        "name": "MCP Neo4j HTTPS Project",
+        "type": "Project",
+        "observations": [
+          "Project revision starting - consolidating to single SSE endpoint",
+          "Target endpoint: memory.ainshtein.dev/mcp",
+          "Using HTTPS with SSL certificates",
+          "Neo4j database connection configured",
+          "Current structure has multiple server types but needs consolidation"
+        ]
+      },
+      {
+        "name": "Environment Configuration",
+        "type": "Configuration",
+        "observations": [
+          "HTTP_PORT=443 for SSL",
+          "Neo4j cloud database connection",
+          "SSL certificate files configured",
+          "Host binding to 0.0.0.0",
+          "Path binding to /mcp"
+        ]
+      },
+      {
+        "name": "Neo4j Memory Component",
+        "type": "Component",
+        "observations": [
+          "Knowledge graph memory storage",
+          "Entity and relationship management",
+          "Cross-session persistence",
+          "Primary MCP functionality focus"
+        ]
+      },
+      {
+        "name": "SSE Server Architecture",
+        "type": "Architecture",
+        "observations": [
+          "Server-Sent Events over HTTPS",
+          "Single endpoint serving MCP over SSE",
+          "Bridge from STDIO MCP to SSE",
+          "Production-ready code required",
+          "SSL termination with provided certificates"
+        ]
+      },
+      {
+        "name": "Project Revision Phase",
+        "type": "Development Phase",
+        "observations": [
+          "Cleaning up multiple server implementations into single SSE server",
+          "Removing unnecessary complexity and spaghetti code",
+          "Consolidating to only essential functionality",
+          "Updating to production-ready architecture"
+        ]
+      },
+      {
+        "name": "consolidation-roadmap",
+        "type": "Roadmap",
+        "observations": [
+          "Remove all existing server directories",
+          "Create single unified server structure",
+          "Implement SSL/HTTPS support with FastMCP",
+          "Configure proper environment variable handling",
+          "Setup production logging and error handling",
+          "Create minimal requirements.txt with exact versions",
+          "Generate clean README without implementation details",
+          "✓ Removed all existing server directories",
+          "✓ Created single unified server structure",
+          "✓ Implemented SSL/HTTPS support with FastMCP",
+          "✓ Configured proper environment variable handling",
+          "✓ Setup production logging and error handling",
+          "✓ Created minimal requirements.txt with exact versions",
+          "✓ Generated clean README without implementation details",
+          "✓ Added proper .gitignore and packaging files",
+          "✅ COMPLETE: Full project consolidation finished",
+          "✅ Single server architecture implemented",
+          "✅ Production-ready codebase created",
+          "✅ Clean project structure established",
+          "✅ All unnecessary complexity removed",
+          "✅ Environment-based configuration implemented"
+        ]
+      },
+      {
+        "name": "mcp-neo4j-consolidated",
+        "type": "Project",
+        "observations": [
+          "Single consolidated MCP server for Neo4j operations",
+          "Runs as SSE over HTTPS at memory.ainshtein.dev/mcp",
+          "Port 443 with SSL certificates",
+          "Neo4j cloud connection via neo4j+s://",
+          "Production-ready with proper error handling",
+          "Clean architecture without unnecessary complexity",
+          "Consolidated project structure created",
+          "All old servers removed and cleaned up",
+          "Single unified server with SSE/HTTPS support implemented",
+          "Production-ready logging and error handling added",
+          "Environment variable configuration implemented",
+          "Clean README without implementation details created",
+          "Proper Python packaging with pyproject.toml",
+          "SSL certificate support for HTTPS on port 443",
+          "✅ Project consolidation completed successfully",
+          "✅ Virtual environment created and configured",
+          "✅ All dependencies installed and verified",
+          "✅ Module imports working correctly",
+          "✅ Ready for production deployment",
+          "✅ Server can be started with: python -m src.mcp_neo4j or python start.py"
+        ]
+      },
+      {
+        "name": "neo4j-memory-functionality",
+        "type": "Feature",
+        "observations": [
+          "Full knowledge graph CRUD operations",
+          "Entity management with observations",
+          "Relationship creation and deletion",
+          "Full-text search capabilities",
+          "Graph traversal and querying",
+          "Batch operations for efficiency"
+        ]
+      },
+      {
+        "name": "HTTPS Setup Project",
+        "type": "Project",
+        "observations": [
+          "Setting up HTTPS for memory.aynshteyn.dev",
+          "Server currently running on 95.163.223.236:19450/sse",
+          "Domain DNS record created",
+          "SSL certificates available",
+          "Added SSL support to FastMCP server",
+          "Modified server.py to accept SSL parameters",
+          "Added SSL configuration arguments",
+          "Created production.config file",
+          "Created run_https.sh startup script",
+          "SSL certificates supported: domain.cert.pem and private.key.pem",
+          "✅ HTTPS implementation completed",
+          "FastMCP server modified for SSL support",
+          "Production configuration created",
+          "Startup script with SSL validation",
+          "Comprehensive documentation provided",
+          "Ready for deployment on memory.aynshteyn.dev",
+          "Next step: Deploy certificates and run ./run_https.sh"
+        ]
+      },
+      {
+        "name": "Production Deployment",
+        "type": "Process",
+        "observations": [
+          "Systemd service configuration",
+          "PM2 process management",
+          "Environment variable setup",
+          "Port 443 HTTPS binding"
+        ]
+      },
+      {
+        "name": "run_https.sh",
+        "type": "Script",
+        "observations": [
+          "Executable startup script",
+          "SSL certificate validation",
+          "Production configuration loading",
+          "HTTPS server launch"
+        ]
+      },
+      {
+        "name": "HTTPS_SETUP.md",
+        "type": "Documentation",
+        "observations": [
+          "Comprehensive guide for HTTPS setup",
+          "Step-by-step instructions",
+          "Production deployment options",
+          "Troubleshooting section",
+          "Security recommendations"
+        ]
+      },
+      {
+        "name": "SSL Certificates",
+        "type": "Resource",
+        "observations": [
+          "domain.cert.pem",
+          "private.key.pem",
+          "public.key.pem",
+          "Located in user directory",
+          "Script checks for certificates at /home/user/ssl/",
+          "Supports domain.cert.pem and private.key.pem format",
+          "Automatic SSL validation in startup script"
+        ]
+      },
+      {
+        "name": "FastMCP Server",
+        "type": "Component",
+        "observations": [
+          "Running mcp-neo4j-http-proxy",
+          "Uses uvicorn underneath",
+          "Currently HTTP only on port 19450",
+          "Modified create_http_proxy function to support SSL",
+          "Added ssl_certfile, ssl_keyfile, ssl_enabled parameters",
+          "HTTPS support via uvicorn SSL configuration",
+          "Conditional HTTPS/HTTP startup based on SSL configuration"
+        ]
+      },
+      {
+        "name": "memory.aynshteyn.dev",
+        "type": "Domain",
+        "observations": [
+          "Target domain for HTTPS setup",
+          "DNS record already configured",
+          "Points to 95.163.223.236"
+        ]
+      },
+      {
+        "name": "project-completion-summary",
+        "type": "milestone",
+        "observations": [
+          "✅ MISSION ACCOMPLISHED: Neo4j MCP HTTP Addon complete",
+          "✅ Working HTTP server on port 8000 with SSE transport",
+          "✅ Compatible with MCP Inspector, ChatGPT, and all HTTP MCP clients",
+          "✅ All 10 Neo4j memory tools preserved and accessible",
+          "✅ Neo4j Aura Cloud integration tested and working",
+          "✅ Production-ready with Docker, health checks, error handling",
+          "✅ Comprehensive documentation and quick start guide",
+          "✅ Clean code review completed - removed debug code",
+          "✅ Committed to GitHub: https://github.com/Vladikasik/mcp-neo4j-https.git",
+          "✅ Project ready for deployment on white IP server"
+        ]
+      },
+      {
+        "name": "mcp-neo4j-http-addon",
+        "type": "project",
+        "observations": [
+          "Python HTTP addon for Neo4j MCP tools",
+          "Goal: Add HTTP connectivity to existing stdio-based MCP servers",
+          "Must preserve Aura Cloud functionality",
+          "Will be deployed on white IP server",
+          "Modern approach using Streamable HTTP transport",
+          "Using FastMCP framework for HTTP transport",
+          "Port 69420 for deployment",
+          "No authentication - open for ChatGPT access",
+          "Focus only on memory MCP server",
+          "Streamable HTTP transport (modern standard)",
+          "Proxy pattern to wrap existing stdio server",
+          "✅ COMPLETED: Full HTTP proxy server implementation",
+          "FastMCP-based server with Streamable HTTP transport",
+          "All 10 Neo4j memory tools preserved and exposed",
+          "Production-ready with health checks, logging, error handling",
+          "Easy deployment with Docker, startup scripts, configuration examples",
+          "Comprehensive README with full documentation",
+          "Test suite included for validation",
+          "File structure: servers/mcp-neo4j-http-proxy/",
+          "✅ WORKING: MCP Inspector successfully connected",
+          "✅ WORKING: All 10 Neo4j tools accessible via HTTP",
+          "✅ WORKING: SSE transport compatibility confirmed",
+          "Ready for code cleanup and GitHub deployment",
+          "Production-ready HTTP server for Neo4j MCP tools",
+          "✅ COMPLETED & DEPLOYED: Successfully committed to GitHub",
+          "Commit hash: 1e76b56",
+          "10 files added: 901 insertions",
+          "Repository: https://github.com/Vladikasik/mcp-neo4j-https.git",
+          "Production-ready, tested, and documented"
+        ]
+      },
+      {
+        "name": "http-proxy-deliverables",
+        "type": "deliverable_summary",
+        "observations": [
+          "Complete FastMCP HTTP server in servers/mcp-neo4j-http-proxy/",
+          "10 Neo4j memory tools exposed over HTTP",
+          "Port 69420 (as requested)",
+          "Streamable HTTP transport (modern MCP standard)",
+          "No authentication (ChatGPT compatible)",
+          "Health check endpoint at /health",
+          "Production deployment ready",
+          "Docker support included",
+          "Comprehensive documentation and examples",
+          "Quick Start Guide created for immediate deployment",
+          "Three deployment options: pip install, startup script, Docker",
+          "Complete test suite for validation",
+          "Ready for production deployment on white IP server",
+          "Fully compatible with ChatGPT and other HTTP MCP clients"
+        ]
+      }
+    ],
+    "relations": [
+      {
+        "source": "mcp-neo4j-http-addon",
+        "target": "current-mcp-servers",
+        "relationType": "extends"
+      },
+      {
+        "source": "current-mcp-servers",
+        "target": "mcp-neo4j-http-addon",
+        "relationType": "provides_functionality_to"
+      },
+      {
+        "source": "http-proxy-deliverables",
+        "target": "current-mcp-servers",
+        "relationType": "http_wraps"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "Knowledge Graph Management",
+        "relationType": "PROVIDES"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "SSE Bridge Implementation",
+        "relationType": "IMPLEMENTS"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "Production Domain Configuration",
+        "relationType": "IMPLEMENTS"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "Production Architecture",
+        "relationType": "FOLLOWS"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "SSL Certificate Error",
+        "relationType": "ENCOUNTERED"
+      },
+      {
+        "source": "Neo4j MCP SSE Bridge",
+        "target": "SSL Configuration Fix",
+        "relationType": "RESOLVED"
+      },
+      {
+        "source": "Production SSL Setup",
+        "target": "Production Domain Configuration",
+        "relationType": "IMPLEMENTS"
+      },
+      {
+        "source": "SSL Configuration Fix",
+        "target": "Production SSL Setup",
+        "relationType": "ENABLES"
+      },
+      {
+        "source": "SSL Configuration Fix",
+        "target": "Production Architecture",
+        "relationType": "IMPROVES"
+      },
+      {
+        "source": "SSE Bridge Implementation",
+        "target": "Production Architecture",
+        "relationType": "USES"
+      },
+      {
+        "source": "Project Cleanup Strategy",
+        "target": "Production Architecture",
+        "relationType": "CREATES"
+      },
+      {
+        "source": "Production Architecture",
+        "target": "Development vs Production",
+        "relationType": "SUPPORTS"
+      },
+      {
+        "source": "Production Domain Configuration",
+        "target": "Production Architecture",
+        "relationType": "ENHANCES"
+      },
+      {
+        "source": "HTTP Proxy Removal",
+        "target": "Project Cleanup Strategy",
+        "relationType": "EXECUTES"
+      },
+      {
+        "source": "Production Domain Configuration",
+        "target": "SSE Bridge Implementation",
+        "relationType": "CONFIGURES"
+      },
+      {
+        "source": "SSL Certificate Error",
+        "target": "Development vs Production",
+        "relationType": "REVEALS"
+      },
+      {
+        "source": "Knowledge Graph Management",
+        "target": "Project Cleanup Strategy",
+        "relationType": "GUIDES"
+      },
+      {
+        "source": "MCP Neo4j HTTPS Project",
+        "target": "SSE Server Architecture",
+        "relationType": "implements"
+      },
+      {
+        "source": "MCP Neo4j HTTPS Project",
+        "target": "Project Revision Phase",
+        "relationType": "undergoing"
+      },
+      {
+        "source": "Neo4j Memory Component",
+        "target": "Environment Configuration",
+        "relationType": "uses"
+      },
+      {
+        "source": "SSE Server Architecture",
+        "target": "Environment Configuration",
+        "relationType": "requires"
+      },
+      {
+        "source": "SSE Server Architecture",
+        "target": "Neo4j Memory Component",
+        "relationType": "serves"
+      },
+      {
+        "source": "mcp-neo4j-consolidated",
+        "target": "consolidation-roadmap",
+        "relationType": "follows"
+      },
+      {
+        "source": "consolidation-roadmap",
+        "target": "neo4j-memory-functionality",
+        "relationType": "includes"
+      },
+      {
+        "source": "mcp-neo4j-consolidated",
+        "target": "neo4j-memory-functionality",
+        "relationType": "implements"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "FastMCP Server",
+        "relationType": "modifies"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "SSL Certificates",
+        "relationType": "uses"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "memory.aynshteyn.dev",
+        "relationType": "targets"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "HTTPS_SETUP.md",
+        "relationType": "documented_by"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "run_https.sh",
+        "relationType": "implemented_by"
+      },
+      {
+        "source": "HTTPS Setup Project",
+        "target": "Production Deployment",
+        "relationType": "enables"
+      },
+      {
+        "source": "Production Deployment",
+        "target": "memory.aynshteyn.dev",
+        "relationType": "serves"
+      },
+      {
+        "source": "run_https.sh",
+        "target": "SSL Certificates",
+        "relationType": "validates"
+      },
+      {
+        "source": "FastMCP Server",
+        "target": "SSL Certificates",
+        "relationType": "requires"
+      },
+      {
+        "source": "memory.aynshteyn.dev",
+        "target": "SSL Certificates",
+        "relationType": "secured_by"
+      },
+      {
+        "source": "mcp-neo4j-http-addon",
+        "target": "project-completion-summary",
+        "relationType": "achieves"
+      },
+      {
+        "source": "mcp-neo4j-http-addon",
+        "target": "http-proxy-deliverables",
+        "relationType": "produces"
+      }
+    ]
+  }
