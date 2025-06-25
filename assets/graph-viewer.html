@@ -208,6 +208,18 @@
   <!-- Correct 3D Force Graph script -->
   <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.77.0/dist/3d-force-graph.min.js"></script>
+  
+  <!-- Import map for ES6 modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+        "three/examples/jsm/postprocessing/UnrealBloomPass.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/UnrealBloomPass.js",
+        "three/examples/jsm/postprocessing/EffectComposer.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/EffectComposer.js",
+        "three/examples/jsm/postprocessing/RenderPass.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/RenderPass.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="graph"></div>
@@ -295,6 +307,55 @@
     function getNodeColor(nodeType, theme) {
       var themeColors = colorMappings[theme] || colorMappings.regular;
       return themeColors[nodeType] || themeColors.default;
+    }
+
+    // Add bloom effect for glowing visuals (based on react-force-graph documentation)
+    function addBloomEffect(graph) {
+      try {
+        logToExpo('✨ Adding bloom effect for glowing visuals...');
+        
+        // Import UnrealBloomPass dynamically
+        import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
+          .then(function(module) {
+            var UnrealBloomPass = module.UnrealBloomPass;
+            
+            var bloomPass = new UnrealBloomPass();
+            
+            // Configure bloom parameters for dramatic glow
+            if (currentTheme === 'matrix') {
+              // Matrix theme: Strong green glow
+              bloomPass.strength = 3.5;
+              bloomPass.radius = 1.2;
+              bloomPass.threshold = 0.1;
+            } else {
+              // Regular theme: Softer multicolored glow
+              bloomPass.strength = 2.0;
+              bloomPass.radius = 0.8;
+              bloomPass.threshold = 0.2;
+            }
+            
+            // Add bloom pass to the graph's post-processing composer
+            if (graph.postProcessingComposer && typeof graph.postProcessingComposer === 'function') {
+              var composer = graph.postProcessingComposer();
+              if (composer && composer.addPass) {
+                composer.addPass(bloomPass);
+                logToExpo('✅ Bloom effect applied successfully! Nodes should now glow beautifully');
+              } else {
+                logToExpo('⚠️ Graph composer exists but cannot add passes');
+              }
+            } else {
+              logToExpo('⚠️ Graph does not support post-processing composer');
+            }
+          })
+          .catch(function(error) {
+            logToExpo('❌ Failed to load UnrealBloomPass: ' + error.message, 'error');
+            logToExpo('💡 Continuing without bloom effect - graph still functional');
+          });
+          
+      } catch (error) {
+        logToExpo('❌ Bloom effect setup error: ' + error.message, 'error');
+        logToExpo('💡 Continuing without bloom effect - graph still functional');
+      }
     }
 
     // Hardcoded test data
@@ -481,6 +542,7 @@
           .enableNodeDrag(true)
           .onEngineStop(function() {
             logToExpo('🎯 Graph layout stabilized');
+            addBloomEffect(Graph);
           });
         
         currentGraph = Graph;
@@ -679,6 +741,7 @@
           .enableNodeDrag(true)
           .onEngineStop(function() {
             logToExpo('🎯 Graph layout stabilized');
+            addBloomEffect(Graph);
           });
         
         currentGraph = Graph;

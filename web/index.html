@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Neron Graph Visualization</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#000003">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Neron Graph">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/favicon.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000003;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      color: #ffffff;
+    }
+    
+    #root {
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    /* Loading screen styles */
+    .expo-splash-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000003;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    
+    .expo-splash-title {
+      color: #00FF41;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+    }
+    
+    .expo-splash-subtitle {
+      color: #00AA22;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 1px;
+      margin-bottom: 30px;
+    }
+    
+    .expo-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 255, 65, 0.3);
+      border-top: 3px solid #00FF41;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .expo-loading-text {
+      color: #00DD35;
+      font-size: 12px;
+      font-weight: 500;
+      margin-top: 15px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    
+    /* Preloader for Three.js and 3D Force Graph libraries */
+    .library-preloader {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #00FF41;
+      border-radius: 5px;
+      padding: 10px;
+      font-size: 10px;
+      color: #00FF41;
+      font-family: 'JetBrains Mono', monospace;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .library-preloader.visible {
+      opacity: 1;
+    }
+    
+    /* Safari-specific optimizations */
+    @supports (-webkit-appearance: none) {
+      body {
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    }
+    
+    /* Disable pull-to-refresh on Safari */
+    body {
+      overscroll-behavior: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div class="expo-splash-screen" id="expo-splash">
+    <div class="expo-splash-title">NERON GRAPH VISUALIZATION</div>
+    <div class="expo-splash-subtitle">Neural Network Analysis Platform</div>
+    <div class="expo-loading-spinner"></div>
+    <div class="expo-loading-text">Initializing Neural Matrix...</div>
+  </div>
+  
+  <!-- Library Preloader Status -->
+  <div class="library-preloader" id="library-status">
+    <div>🔄 Loading 3D Libraries...</div>
+  </div>
+  
+  <!-- Main App Container -->
+  <div id="root"></div>
+  
+  <!-- Preload Three.js and 3D Force Graph for better performance -->
+  <script>
+    // Preload libraries for web graph visualization
+    window.addEventListener('load', function() {
+      const libraryStatus = document.getElementById('library-status');
+      libraryStatus.classList.add('visible');
+      
+      // Load Three.js
+      const threeScript = document.createElement('script');
+      threeScript.src = 'https://unpkg.com/three@0.157.0/build/three.min.js';
+      threeScript.onload = function() {
+        console.log('✅ THREE.js loaded successfully');
+        
+        // Load 3D Force Graph after Three.js
+        const forceGraphScript = document.createElement('script');
+        forceGraphScript.src = 'https://unpkg.com/3d-force-graph@1.77.0/dist/3d-force-graph.min.js';
+        forceGraphScript.onload = function() {
+          console.log('✅ 3D Force Graph loaded successfully');
+          libraryStatus.innerHTML = '<div>✅ 3D Libraries Ready</div>';
+          setTimeout(() => {
+            libraryStatus.classList.remove('visible');
+          }, 2000);
+        };
+        forceGraphScript.onerror = function() {
+          console.error('❌ Failed to load 3D Force Graph');
+          libraryStatus.innerHTML = '<div>❌ Library Load Failed</div>';
+        };
+        document.head.appendChild(forceGraphScript);
+      };
+      threeScript.onerror = function() {
+        console.error('❌ Failed to load THREE.js');
+        libraryStatus.innerHTML = '<div>❌ Library Load Failed</div>';
+      };
+      document.head.appendChild(threeScript);
+    });
+    
+    // Hide splash screen when React app is ready
+    window.addEventListener('DOMContentLoaded', function() {
+      // Give React time to mount
+      setTimeout(function() {
+        const splash = document.getElementById('expo-splash');
+        if (splash) {
+          splash.style.opacity = '0';
+          splash.style.transition = 'opacity 0.5s ease';
+          setTimeout(() => {
+            splash.style.display = 'none';
+          }, 500);
+        }
+      }, 2000);
+    });
+    
+    // Safari-specific optimizations
+    if (/Safari/.test(navigator.userAgent) && /Apple Computer/.test(navigator.vendor)) {
+      console.log('🍎 Safari detected - applying web optimizations');
+      
+      // Prevent zoom on double tap
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+      
+      // Prevent elastic scroll
+      document.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+    }
+  </script>
+</body>
+</html> 

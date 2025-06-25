@@ -137,9 +137,11 @@ const createStyles = (theme: any) => StyleSheet.create({
     textAlign: 'center',
     fontFamily: theme.fonts.primary,
     letterSpacing: theme.type === 'matrix' ? 2 : 0,
-    textShadowColor: theme.type === 'matrix' ? theme.colors.primary : 'transparent',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: theme.type === 'matrix' ? 8 : 0,
+    ...(theme.type === 'matrix' && {
+      textShadowColor: theme.colors.primary,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 8,
+    }),
   },
   headerSubtitle: {
     color: theme.colors.textSecondary,
