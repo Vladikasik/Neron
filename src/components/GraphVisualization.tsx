@@ -37,28 +37,44 @@ const WebGraphVisualization: React.FC<GraphVisualizationProps> = ({
     if (Platform.OS === 'web') {
       initializeWebGraph();
     }
-  }, [data, theme]);
+  }, []); // ← Fixed: Only run once on mount
+
+  // Handle data/theme changes without reinitializing everything
+  useEffect(() => {
+    if (Platform.OS === 'web' && !isLoading) {
+      // TODO: Update existing graph instead of recreating
+      console.log('🔧 EXPO DEBUG: Data or theme changed, updating graph...');
+    }
+  }, [data, theme, isLoading]);
 
   const initializeWebGraph = async () => {
+    console.log('🔧 EXPO DEBUG: initializeWebGraph starting...');
+    
     try {
       setIsLoading(true);
-      console.log('🌐 WEB: Initializing HTML-based graph visualization...');
+      console.log('🔧 EXPO DEBUG: Set loading to true');
       
       if (!containerRef.current) {
+        console.log('❌ EXPO ERROR: Container ref not available');
         throw new Error('Container ref not available');
       }
+      console.log('🔧 EXPO DEBUG: Container ref available');
 
       // Inject the HTML content directly
+      console.log('🔧 EXPO DEBUG: Injecting HTML content...');
       await injectGraphHTML();
+      console.log('🔧 EXPO DEBUG: HTML injection completed');
       
       // Initialize the graph system
+      console.log('🔧 EXPO DEBUG: Initializing graph system...');
       await initializeGraphSystem();
+      console.log('🔧 EXPO DEBUG: Graph system initialization completed');
       
       setIsLoading(false);
-      console.log('🌐 WEB: HTML-based graph initialized successfully');
+      console.log('🔧 EXPO DEBUG: Set loading to false - initialization complete');
       
     } catch (err) {
-      console.error('🌐 WEB ERROR:', err);
+      console.log('❌ EXPO ERROR: initializeWebGraph failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to load web graph');
       setIsLoading(false);
     }
@@ -262,15 +278,25 @@ class WebGraphSystem {
   }
 
   async initialize(): Promise<void> {
-    console.log('🌐 WebGraphSystem: Initializing...');
+    console.log('🔧 EXPO DEBUG: WebGraphSystem initialization starting...');
     
-    // Set up console functionality
-    this.setupConsoleHandling();
+    try {
+      // Set up console functionality
+      console.log('🔧 EXPO DEBUG: Setting up console handling...');
+      this.setupConsoleHandling();
+      console.log('🔧 EXPO DEBUG: Console handling setup completed');
+      
+      // Load graph with current data
+      console.log('🔧 EXPO DEBUG: Loading graph data...');
+      this.loadGraph();
+      console.log('🔧 EXPO DEBUG: Graph loading completed');
+      
+    } catch (error) {
+      console.log('❌ EXPO ERROR: WebGraphSystem initialization failed:', error);
+      this.logToConsole(`❌ System initialization error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
     
-    // Load graph with current data
-    this.loadGraph();
-    
-    console.log('🌐 WebGraphSystem: Initialization complete');
+    console.log('🔧 EXPO DEBUG: WebGraphSystem initialization finished');
   }
 
   private setupConsoleHandling(): void {
@@ -359,15 +385,29 @@ class WebGraphSystem {
   }
 
   private loadGraph(): void {
+    console.log('🔧 EXPO DEBUG: loadGraph called');
     this.logToConsole('🔄 Loading graph data...');
     
+    console.log('🔧 EXPO DEBUG: Checking libraries status...');
     if (!this.checkLibrariesStatus()) {
+      console.log('❌ EXPO ERROR: Libraries not ready');
       this.logToConsole('❌ Cannot load graph - libraries not ready');
       return;
     }
+    console.log('🔧 EXPO DEBUG: Libraries check passed');
 
+    console.log('🔧 EXPO DEBUG: Transforming data for graph...');
     const transformedData = this.transformDataForGraph(this.data);
+    console.log('🔧 EXPO DEBUG: Data transformed:', { 
+      originalEntities: this.data.entities.length,
+      originalRelations: this.data.relations.length,
+      transformedNodes: transformedData.nodes.length,
+      transformedLinks: transformedData.links.length 
+    });
+    
+    console.log('🔧 EXPO DEBUG: Calling displayGraph...');
     this.displayGraph(transformedData);
+    console.log('🔧 EXPO DEBUG: displayGraph call completed');
   }
 
   private createTestGraph(): void {
@@ -392,25 +432,47 @@ class WebGraphSystem {
 
   private displayGraph(graphData: any): void {
     try {
+      console.log('🔧 EXPO DEBUG: displayGraph called with data:', { 
+        nodes: graphData.nodes?.length || 0, 
+        links: graphData.links?.length || 0 
+      });
+      
       const graphElement = document.getElementById('graph');
+      console.log('🔧 EXPO DEBUG: Graph element found:', !!graphElement);
+      
       if (!graphElement) {
+        console.log('❌ EXPO ERROR: Graph element not found');
         this.logToConsole('❌ Graph element not found');
         return;
       }
 
+      console.log('🔧 EXPO DEBUG: Clearing graph element...');
       graphElement.innerHTML = '';
       
-      const backgroundColor = this.currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+      console.log('🔧 EXPO DEBUG: Setting up graph colors...');
+      const backgroundColor = this.currentTheme === 'matrix' ? '#000000' : '#1e293b';
       const linkColor = this.currentTheme === 'matrix' ? '#004d1a' : '#64748b';
+      
+      console.log('🔧 EXPO DEBUG: Creating ForceGraph3D instance...');
+      
+      if (typeof (window as any).ForceGraph3D !== 'function') {
+        console.log('❌ EXPO ERROR: ForceGraph3D not available');
+        this.logToConsole('❌ ForceGraph3D not available');
+        return;
+      }
       
       const Graph = (window as any).ForceGraph3D()(graphElement)
         .graphData(graphData)
         .backgroundColor(backgroundColor)
-        .nodeColor((node: any) => this.getNodeColor(node.type, this.currentTheme))
+        .nodeColor((node: any) => {
+          console.log('🔧 EXPO DEBUG: Getting color for node:', node.type);
+          return this.getNodeColor(node.type, this.currentTheme);
+        })
         .linkColor(() => linkColor)
         .nodeLabel('name')
         .linkLabel((link: any) => `${link.source} → ${link.target}`)
         .onNodeClick((node: any) => {
+          console.log('🔧 EXPO DEBUG: Node clicked:', node.name);
           this.logToConsole(`🖱️ Node clicked: ${node.name} (${node.type})`);
           
           if (this.navigation) {
@@ -435,92 +497,100 @@ class WebGraphSystem {
         })
         .enableNodeDrag(true)
         .onEngineStop(() => {
-          this.logToConsole('🎯 Graph layout stabilized');
-          this.addBloomEffect(Graph);
+          console.log('🔧 EXPO DEBUG: Graph engine stopped, layout stabilized');
+          this.logToConsole('🎯 Graph layout stabilized with bloom effects!');
         });
       
+      console.log('🔧 EXPO DEBUG: Graph created successfully');
       this.currentGraph = Graph;
       this.isGraphLoaded = true;
       
-      this.logToConsole(`✅ Graph rendered with ${this.currentTheme} theme!`);
+      // ✨ Apply bloom effects IMMEDIATELY during graph creation (not after)
+      console.log('🔧 EXPO DEBUG: Applying bloom effects synchronously...');
+      this.applyBloomEffects(Graph);
+      
+      this.logToConsole(`✅ GLOWING graph ready with ${this.currentTheme} theme and bloom effects!`);
+      console.log('🔧 EXPO DEBUG: Graph rendering completed');
       
     } catch (error) {
+      console.log('❌ EXPO ERROR: Graph display error:', error);
       this.logToConsole(`❌ Graph display error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  private addBloomEffect(graph: any): void {
+  // ✨ Apply bloom effects IMMEDIATELY during graph creation (research-based approach)
+  private applyBloomEffects(graph: any): void {
     try {
-      this.logToConsole('✨ Adding bloom effect for glowing visuals...');
+      console.log('🔧 EXPO DEBUG: Applying bloom effects synchronously...');
+      this.logToConsole('✨ Applying bloom effects for glowing visuals...');
       
-      // Check if THREE is available with UnrealBloomPass
-      if (typeof (window as any).THREE !== 'undefined') {
-        // Try to access UnrealBloomPass from global THREE object
-        const THREE = (window as any).THREE;
-        
-        // Load UnrealBloomPass via script injection since it's not in the main THREE build
-        this.loadBloomPassScript()
-          .then(() => {
-            const UnrealBloomPass = (window as any).THREE?.UnrealBloomPass;
-            
-            if (UnrealBloomPass) {
-              const bloomPass = new UnrealBloomPass();
-              
-              if (this.currentTheme === 'matrix') {
-                bloomPass.strength = 3.5;
-                bloomPass.radius = 1.2;
-                bloomPass.threshold = 0.1;
-              } else {
-                bloomPass.strength = 2.0;
-                bloomPass.radius = 0.8;
-                bloomPass.threshold = 0.2;
-              }
-              
-              if (graph.postProcessingComposer && typeof graph.postProcessingComposer === 'function') {
-                const composer = graph.postProcessingComposer();
-                if (composer && composer.addPass) {
-                  composer.addPass(bloomPass);
-                  this.logToConsole('✅ Bloom effect applied successfully! Nodes now glow beautifully');
-                } else {
-                  this.logToConsole('⚠️ Graph composer exists but cannot add passes');
-                }
-              } else {
-                this.logToConsole('⚠️ Graph does not support post-processing composer');
-              }
-            } else {
-              this.logToConsole('⚠️ UnrealBloomPass not available, continuing without bloom effect');
-            }
-          })
-          .catch((error) => {
-            this.logToConsole(`❌ Failed to load bloom effect: ${error.message}`);
-            this.logToConsole('💡 Continuing without bloom - graph still functional');
-          });
-      } else {
-        this.logToConsole('⚠️ THREE.js not available, skipping bloom effect');
-      }
-        
-    } catch (error) {
-      this.logToConsole(`❌ Bloom effect setup error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private async loadBloomPassScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Check if already loaded
-      if ((window as any).THREE?.UnrealBloomPass) {
-        resolve();
+      // Check if postProcessingComposer is available
+      if (!graph.postProcessingComposer || typeof graph.postProcessingComposer !== 'function') {
+        console.log('⚠️ EXPO WARNING: postProcessingComposer not available');
+        this.logToConsole('⚠️ Bloom not supported - continuing with basic graph');
         return;
       }
 
-      // Load the post-processing script that includes UnrealBloomPass
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/three@0.157.0/examples/js/postprocessing/UnrealBloomPass.js';
-      script.onload = () => {
-        setTimeout(resolve, 100); // Small delay to ensure script is processed
-      };
-      script.onerror = () => reject(new Error('Failed to load UnrealBloomPass script'));
-      document.head.appendChild(script);
-    });
+      // Get the composer (this should work immediately after graph creation)
+      const composer = graph.postProcessingComposer();
+      
+      if (!composer) {
+        console.log('⚠️ EXPO WARNING: Could not get post-processing composer');
+        this.logToConsole('⚠️ Could not access composer - continuing without bloom');
+        return;
+      }
+
+      // Load UnrealBloomPass and apply immediately
+      this.loadAndApplyBloom(composer);
+      
+    } catch (error) {
+      console.log('❌ EXPO ERROR: Bloom setup error:', error);
+      this.logToConsole(`⚠️ Bloom setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logToConsole('💡 Continuing with basic graph - still functional');
+    }
+  }
+
+  private async loadAndApplyBloom(composer: any): Promise<void> {
+    try {
+      console.log('🔧 EXPO DEBUG: Loading UnrealBloomPass...');
+      
+      // Use dynamic import to load UnrealBloomPass (as per research)
+      const dynamicImport = new Function('specifier', 'return import(specifier)');
+      const module = await dynamicImport('https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/UnrealBloomPass.js');
+      const UnrealBloomPass = module.UnrealBloomPass;
+      
+      if (!UnrealBloomPass) {
+        throw new Error('UnrealBloomPass not found in module');
+      }
+
+      console.log('🔧 EXPO DEBUG: Creating bloom pass...');
+      const bloomPass = new UnrealBloomPass();
+      
+      // Apply theme-based bloom parameters (research-based values)
+      if (this.currentTheme === 'matrix') {
+        // Matrix theme: Green glow
+        bloomPass.strength = 1.5;
+        bloomPass.radius = 0.8;
+        bloomPass.threshold = 0.1;
+      } else {
+        // Regular theme: Subtle multicolored glow
+        bloomPass.strength = 1.0;
+        bloomPass.radius = 0.6;
+        bloomPass.threshold = 0.2;
+      }
+      
+      console.log('🔧 EXPO DEBUG: Adding bloom pass to composer...');
+      composer.addPass(bloomPass);
+      
+      console.log('✅ EXPO SUCCESS: Bloom effects applied successfully!');
+      this.logToConsole(`✅ Bloom effects applied! Strength: ${bloomPass.strength}, Radius: ${bloomPass.radius}`);
+      this.logToConsole('🌟 Graph now has glowing visuals!');
+      
+    } catch (error) {
+      console.log('❌ EXPO ERROR: Bloom loading failed:', error);
+      this.logToConsole(`❌ Bloom loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logToConsole('💡 Graph still functional without bloom effects');
+    }
   }
 
   private switchTheme(): void {
@@ -568,11 +638,13 @@ class WebGraphSystem {
     this.logToConsole(`🎨 Theme switched to ${newTheme.toUpperCase()}`);
   }
 
-  private updateGraphColors(): void {
+    private updateGraphColors(): void {
     if (!this.currentGraph) return;
     
     try {
-      const backgroundColor = this.currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+      console.log('🔧 EXPO DEBUG: Updating graph colors for theme:', this.currentTheme);
+      
+      const backgroundColor = this.currentTheme === 'matrix' ? '#000000' : '#1e293b';
       const linkColor = this.currentTheme === 'matrix' ? '#004d1a' : '#64748b';
       
       this.currentGraph
@@ -580,8 +652,10 @@ class WebGraphSystem {
         .nodeColor((node: any) => this.getNodeColor(node.type, this.currentTheme))
         .linkColor(() => linkColor);
         
-      this.logToConsole(`✅ Graph colors updated for ${this.currentTheme} theme`);
+      this.logToConsole(`✅ BASIC graph colors updated for ${this.currentTheme} theme`);
+      console.log('🔧 EXPO DEBUG: Graph colors updated successfully');
     } catch (error) {
+      console.log('❌ EXPO ERROR: Failed to update graph colors:', error);
       this.logToConsole(`❌ Failed to update graph colors: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

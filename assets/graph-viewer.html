@@ -309,54 +309,7 @@
       return themeColors[nodeType] || themeColors.default;
     }
 
-    // Add bloom effect for glowing visuals (based on react-force-graph documentation)
-    function addBloomEffect(graph) {
-      try {
-        logToExpo('✨ Adding bloom effect for glowing visuals...');
-        
-        // Import UnrealBloomPass dynamically
-        import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
-          .then(function(module) {
-            var UnrealBloomPass = module.UnrealBloomPass;
-            
-            var bloomPass = new UnrealBloomPass();
-            
-            // Configure bloom parameters for dramatic glow
-            if (currentTheme === 'matrix') {
-              // Matrix theme: Strong green glow
-              bloomPass.strength = 3.5;
-              bloomPass.radius = 1.2;
-              bloomPass.threshold = 0.1;
-            } else {
-              // Regular theme: Softer multicolored glow
-              bloomPass.strength = 2.0;
-              bloomPass.radius = 0.8;
-              bloomPass.threshold = 0.2;
-            }
-            
-            // Add bloom pass to the graph's post-processing composer
-            if (graph.postProcessingComposer && typeof graph.postProcessingComposer === 'function') {
-              var composer = graph.postProcessingComposer();
-              if (composer && composer.addPass) {
-                composer.addPass(bloomPass);
-                logToExpo('✅ Bloom effect applied successfully! Nodes should now glow beautifully');
-              } else {
-                logToExpo('⚠️ Graph composer exists but cannot add passes');
-              }
-            } else {
-              logToExpo('⚠️ Graph does not support post-processing composer');
-            }
-          })
-          .catch(function(error) {
-            logToExpo('❌ Failed to load UnrealBloomPass: ' + error.message, 'error');
-            logToExpo('💡 Continuing without bloom effect - graph still functional');
-          });
-          
-      } catch (error) {
-        logToExpo('❌ Bloom effect setup error: ' + error.message, 'error');
-        logToExpo('💡 Continuing without bloom effect - graph still functional');
-      }
-    }
+    // Simplified - complex bloom effects removed for debugging
 
     // Hardcoded test data
     var testGraphData = {
@@ -457,7 +410,8 @@
       if (!currentGraph) return;
       
       try {
-        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        // Better background colors - pure black for matrix, dark blue-gray for regular
+        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
         var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
         
         // Update graph colors
@@ -467,6 +421,8 @@
             return getNodeColor(node.type, currentTheme);
           })
           .linkColor(function() { return linkColor; });
+        
+        // Simplified - no bloom effects applied
           
         logToExpo('✅ Graph colors updated for ' + currentTheme + ' theme');
       } catch (error) {
@@ -523,9 +479,11 @@
         var graphElement = document.getElementById('graph');
         graphElement.innerHTML = '';
         
-        // Apply theme colors
-        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
+        // Apply basic theme colors
+        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
         var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
+        
+        console.log('🔧 HTML DEBUG: Creating basic test graph...');
         
         var Graph = window.ForceGraph3D()(graphElement)
           .graphData(testGraphData)
@@ -537,12 +495,13 @@
           .nodeLabel('name')
           .linkLabel(function(link) { return link.source + ' → ' + link.target; })
           .onNodeClick(function(node) {
+            console.log('🔧 HTML DEBUG: Test node clicked:', node.name);
             logToExpo('🖱️ Node clicked: ' + node.name + ' (' + node.type + ')');
           })
           .enableNodeDrag(true)
           .onEngineStop(function() {
-            logToExpo('🎯 Graph layout stabilized');
-            addBloomEffect(Graph);
+            console.log('🔧 HTML DEBUG: Test graph engine stopped');
+            logToExpo('🎯 BASIC test graph layout stabilized');
           });
         
         currentGraph = Graph;
@@ -715,6 +674,12 @@
         var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
         var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
         
+        // Simplified - no bloom state management
+        
+        // Apply better theme colors
+        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
+        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
+        
         // Clear and create graph
         var graphElement = document.getElementById('graph');
         graphElement.innerHTML = '';
@@ -740,8 +705,8 @@
           })
           .enableNodeDrag(true)
           .onEngineStop(function() {
-            logToExpo('🎯 Graph layout stabilized');
-            addBloomEffect(Graph);
+            console.log('🔧 HTML DEBUG: External graph engine stopped');
+            logToExpo('🎯 BASIC external graph layout stabilized');
           });
         
         currentGraph = Graph;
@@ -756,7 +721,8 @@
 
     // Initialize everything when DOM is ready
     function initialize() {
-      logToExpo('🚀 Neron Graph Engine initialized with multicolored themes');
+      console.log('🔧 HTML DEBUG: HTML initialize() called');
+      logToExpo('🚀 BASIC Neron Graph Engine initialized (simplified for debugging)');
       logToExpo('💡 Commands: "test" for demo, "theme" to switch colors, "init" for external graph');
       
       // Apply initial Matrix theme
