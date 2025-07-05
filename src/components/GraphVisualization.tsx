@@ -86,23 +86,25 @@ const WebGraphVisualization: React.FC<GraphVisualizationProps> = ({
     // Clear container
     containerRef.current.innerHTML = '';
 
-    // Create the HTML structure directly
+    // Create the HTML structure matching the mobile HTML file
     const htmlContent = `
-      <div id="graph" style="width: 100%; height: 100%;"></div>
+      <div id="graph-container">
+        <div id="graph"></div>
+      </div>
       
-      <!-- Console toggle button -->
-      <button id="console-toggle" class="console-visible" title="Toggle Console" style="
+      <!-- Bottom-left toggle button -->
+      <button id="console-toggle" title="Toggle Console" style="
         position: fixed;
-        top: 15px;
-        right: 15px;
-        width: 40px;
-        height: 40px;
-        background: rgba(0, 0, 0, 0.8);
+        bottom: 20px;
+        left: 20px;
+        width: 45px;
+        height: 45px;
+        background: rgba(0, 0, 0, 0.9);
         border: 2px solid #00FF41;
         border-radius: 50%;
         color: #00FF41;
         font-family: 'Courier New', monospace;
-        font-size: 18px;
+        font-size: 20px;
         font-weight: bold;
         cursor: pointer;
         z-index: 1001;
@@ -111,59 +113,76 @@ const WebGraphVisualization: React.FC<GraphVisualizationProps> = ({
         justify-content: center;
         transition: all 0.3s ease;
         backdrop-filter: blur(5px);
+        box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
       ">⚡</button>
       
-      <!-- Top-right console -->
+      <!-- Draggable console window -->
       <div id="console" style="
         position: fixed;
-        top: 10px;
-        right: 10px;
-        width: 350px;
-        height: 300px;
-        background: rgba(0, 0, 0, 0.9);
-        border: 1px solid #00FF41;
-        border-radius: 5px;
-        padding: 10px;
+        top: 50px;
+        left: 50px;
+        width: 400px;
+        height: 350px;
+        background: rgba(0, 0, 0, 0.95);
+        border: 2px solid #00FF41;
+        border-radius: 8px;
         font-family: 'Courier New', monospace;
-        font-size: 11px;
         color: #00FF41;
-        box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
-        backdrop-filter: blur(5px);
+        box-shadow: 0 0 25px rgba(0, 255, 65, 0.4);
+        backdrop-filter: blur(8px);
         z-index: 1000;
         display: flex;
         flex-direction: column;
-        transition: transform 0.3s ease, opacity 0.3s ease;
+        transition: opacity 0.3s ease;
       ">
         <div id="console-header" style="
-          color: #00FF41;
+          background: rgba(0, 255, 65, 0.1);
+          padding: 10px 15px;
           border-bottom: 1px solid #00FF41;
-          padding-bottom: 5px;
-          margin-bottom: 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: move;
+          user-select: none;
           font-weight: bold;
-          text-transform: uppercase;
-        ">⚡ NERON CONSOLE</div>
+        ">
+          <span>⚡ NERON CONSOLE</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="console-close" style="
+              background: none;
+              border: none;
+              color: #00FF41;
+              font-size: 16px;
+              cursor: pointer;
+              padding: 2px 6px;
+              border-radius: 3px;
+              transition: background-color 0.2s;
+            ">×</button>
+          </div>
+        </div>
         
         <div id="log-display" style="
           flex: 1;
+          padding: 10px;
           overflow-y: auto;
-          font-size: 10px;
-          line-height: 1.2;
-          padding-right: 5px;
+          font-size: 11px;
+          line-height: 1.3;
+          background: rgba(0, 0, 0, 0.3);
         "></div>
         
         <div id="input-area" style="
-          margin-top: 10px;
+          padding: 10px;
           display: flex;
           align-items: center;
           border-top: 1px solid #00FF41;
-          padding-top: 8px;
+          background: rgba(0, 255, 65, 0.05);
         ">
           <span id="input-prompt" style="
             color: #00FF41;
-            margin-right: 5px;
+            margin-right: 8px;
             font-weight: bold;
           ">></span>
-          <input type="text" id="command-input" placeholder="Type 'init' to load graph, 'test' for demo..." style="
+          <input type="text" id="command-input" placeholder="Type 'help' for commands..." style="
             flex: 1;
             background: transparent;
             border: none;
@@ -303,7 +322,10 @@ class WebGraphSystem {
     const commandInput = document.getElementById('command-input') as HTMLInputElement;
     const consoleToggle = document.getElementById('console-toggle') as HTMLButtonElement;
     const consoleDiv = document.getElementById('console') as HTMLDivElement;
+    const consoleHeader = document.getElementById('console-header') as HTMLDivElement;
+    const consoleClose = document.getElementById('console-close') as HTMLButtonElement;
 
+    // Command input handling
     if (commandInput) {
       commandInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -317,20 +339,21 @@ class WebGraphSystem {
       });
     }
 
+    // Console toggle button
     if (consoleToggle && consoleDiv) {
       let isConsoleVisible = true;
       consoleToggle.addEventListener('click', (e) => {
         e.stopPropagation();
         
         if (isConsoleVisible) {
-          consoleDiv.style.transform = 'translateX(100%)';
           consoleDiv.style.opacity = '0';
+          consoleDiv.style.pointerEvents = 'none';
           consoleToggle.innerHTML = '👁️';
           consoleToggle.title = 'Show Console';
           isConsoleVisible = false;
         } else {
-          consoleDiv.style.transform = 'translateX(0)';
           consoleDiv.style.opacity = '1';
+          consoleDiv.style.pointerEvents = 'all';
           consoleToggle.innerHTML = '⚡';
           consoleToggle.title = 'Hide Console';
           isConsoleVisible = true;
@@ -338,27 +361,96 @@ class WebGraphSystem {
       });
     }
 
-    // Initial welcome message
-    this.logToConsole('🚀 Neron Graph Engine initialized with bloom effects');
-    this.logToConsole('💡 Commands: "init" to load data, "test" for demo, "theme" to switch');
+    // Console close button
+    if (consoleClose && consoleDiv) {
+      consoleClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        consoleDiv.style.opacity = '0';
+        consoleDiv.style.pointerEvents = 'none';
+        if (consoleToggle) {
+          consoleToggle.innerHTML = '👁️';
+          consoleToggle.title = 'Show Console';
+        }
+      });
+    }
+
+    // Make console draggable
+    if (consoleHeader && consoleDiv) {
+      let isDragging = false;
+      let dragOffset = { x: 0, y: 0 };
+
+      consoleHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        const rect = consoleDiv.getBoundingClientRect();
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+        consoleDiv.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const x = e.clientX - dragOffset.x;
+        const y = e.clientY - dragOffset.y;
+        
+        // Boundary constraints
+        const maxX = window.innerWidth - consoleDiv.offsetWidth;
+        const maxY = window.innerHeight - consoleDiv.offsetHeight;
+        
+        const constrainedX = Math.max(0, Math.min(x, maxX));
+        const constrainedY = Math.max(0, Math.min(y, maxY));
+        
+        consoleDiv.style.left = constrainedX + 'px';
+        consoleDiv.style.top = constrainedY + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          consoleDiv.style.cursor = 'default';
+        }
+      });
+    }
+
+    // Initial welcome messages
+    this.logToConsole('🚀 Neron Graph Engine initialized');
+    this.logToConsole('💡 Commands: "help", "init", "test", "theme", "clear", "status"');
   }
 
   private handleCommand(command: string): void {
     const cmd = command.trim().toLowerCase();
     this.logToConsole(`> ${command}`);
     
-    if (cmd === 'init') {
+    if (cmd === 'help') {
+      this.logToConsole('📖 Available commands:');
+      this.logToConsole('   • help - Show this help message');
+      this.logToConsole('   • init - Load current graph data');
+      this.logToConsole('   • test - Create test graph');
+      this.logToConsole('   • theme - Switch themes');
+      this.logToConsole('   • clear - Clear console log');
+      this.logToConsole('   • status - Show system status');
+      this.logToConsole('');
+      this.logToConsole('🖱️ Console is draggable - grab the header to move');
+    } else if (cmd === 'init') {
       this.loadGraph();
     } else if (cmd === 'test') {
       this.createTestGraph();
     } else if (cmd === 'theme') {
       this.switchTheme();
-    } else if (cmd === 'help') {
-      this.logToConsole('📖 Available commands:');
-      this.logToConsole('   • init - Load current graph data');
-      this.logToConsole('   • test - Create test graph');
-      this.logToConsole('   • theme - Switch themes');
-      this.logToConsole('   • help - Show this help');
+    } else if (cmd === 'clear') {
+      const logDisplay = document.getElementById('log-display');
+      if (logDisplay) {
+        logDisplay.innerHTML = '';
+      }
+      this.logToConsole('Console cleared');
+    } else if (cmd === 'status') {
+      this.logToConsole('📊 System Status:');
+      this.logToConsole(`  Theme: ${this.currentTheme.toUpperCase()}`);
+      this.logToConsole(`  Graph loaded: ${this.isGraphLoaded ? 'YES' : 'NO'}`);
+      this.logToConsole(`  Entities: ${this.data.entities.length}`);
+      this.logToConsole(`  Relations: ${this.data.relations.length}`);
+      this.checkLibrariesStatus();
     } else if (cmd === '') {
       // Do nothing for empty command
     } else {

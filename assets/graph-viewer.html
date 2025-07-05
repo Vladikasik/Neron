@@ -6,59 +6,44 @@
   <title>Neo4j Graph Visualization</title>
   
   <style>
+    /* Base styling for the application */
+    * {
+      box-sizing: border-box;
+    }
+
     body { 
       margin: 0; 
       padding: 0; 
       background: #000003;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
     }
-    #graph { 
+
+    #graph-container {
+      position: relative;
       width: 100vw; 
       height: 100vh; 
     }
 
-    /* Top-right console styling */
-    #console {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      width: 350px;
-      height: 300px;
-      background: rgba(0, 0, 0, 0.9);
-      border: 1px solid #00FF41;
-      border-radius: 5px;
-      padding: 10px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: #00FF41;
-      box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
-      backdrop-filter: blur(5px);
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.3s ease, opacity 0.3s ease;
+    #graph {
+      width: 100%;
+      height: 100%;
     }
 
-    #console.hidden {
-      transform: translateX(100%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    /* Console toggle button */
+    /* Console toggle button in bottom-left */
     #console-toggle {
       position: fixed;
-      top: 15px;
-      right: 15px;
-      width: 40px;
-      height: 40px;
+      bottom: 20px;
+      left: 20px;
+      width: 50px;
+      height: 50px;
       background: rgba(0, 0, 0, 0.8);
       border: 2px solid #00FF41;
       border-radius: 50%;
       color: #00FF41;
       font-family: 'Courier New', monospace;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
       cursor: pointer;
       z-index: 1001;
@@ -71,684 +56,823 @@
 
     #console-toggle:hover {
       background: rgba(0, 255, 65, 0.1);
-      box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
       transform: scale(1.1);
     }
 
-    #console-toggle.console-hidden {
-      right: 15px;
+    #console-toggle:active {
+      transform: scale(0.95);
     }
 
-    #console-toggle.console-visible {
-      right: 375px;
+    /* Draggable console window styling */
+    .console-window {
+      position: fixed;
+      top: 50px;
+      right: 50px;
+      width: 400px;
+      height: 350px;
+      background: rgba(0, 0, 0, 0.95);
+      border: 2px solid #00FF41;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0, 255, 65, 0.3);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Courier New', monospace;
+      transition: all 0.3s ease;
+      resize: both;
+      overflow: hidden;
+      min-width: 300px;
+      min-height: 200px;
+      max-width: 80vw;
+      max-height: 80vh;
     }
 
-    #console-header {
-      color: #00FF41;
+    .console-window.hidden {
+      transform: scale(0.8);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Removed minimized styles - no longer needed */
+
+    .console-window.dragging {
+      transition: none;
+      box-shadow: 0 0 40px rgba(0, 255, 65, 0.5);
+    }
+
+    /* Console header */
+    .console-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background: rgba(0, 255, 65, 0.1);
       border-bottom: 1px solid #00FF41;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
-      font-weight: bold;
-      text-transform: uppercase;
+      cursor: move;
+      user-select: none;
+      min-height: 40px;
     }
 
-    #log-display {
+    .console-header:hover {
+      background: rgba(0, 255, 65, 0.15);
+    }
+
+    .console-title {
+      color: #00FF41;
+      font-weight: bold;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .console-controls {
+      display: flex;
+      gap: 5px;
+    }
+
+    .console-btn {
+      width: 20px;
+      height: 20px;
+      background: rgba(0, 255, 65, 0.2);
+      border: 1px solid #00FF41;
+      border-radius: 3px;
+      color: #00FF41;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .console-btn:hover {
+      background: rgba(0, 255, 65, 0.3);
+      transform: scale(1.1);
+    }
+
+    .console-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Console content */
+    .console-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      padding: 10px;
+    }
+
+    .log-display {
       flex: 1;
       overflow-y: auto;
-      font-size: 10px;
-      line-height: 1.2;
-      padding-right: 5px;
+      font-size: 11px;
+      line-height: 1.3;
+      color: #00FF41;
+      padding: 5px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 4px;
+      margin-bottom: 10px;
     }
 
-    #log-display::-webkit-scrollbar {
-      width: 4px;
+    .log-display::-webkit-scrollbar {
+      width: 6px;
     }
 
-    #log-display::-webkit-scrollbar-track {
+    .log-display::-webkit-scrollbar-track {
       background: rgba(0, 255, 65, 0.1);
     }
 
-    #log-display::-webkit-scrollbar-thumb {
+    .log-display::-webkit-scrollbar-thumb {
       background: #00FF41;
-      border-radius: 2px;
+      border-radius: 3px;
     }
 
     .log-entry {
-      margin-bottom: 2px;
+      margin-bottom: 3px;
       opacity: 0.9;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 0.9; transform: translateY(0); }
     }
 
     .log-timestamp {
       color: #00BB29;
-      font-size: 9px;
+      font-size: 10px;
+      margin-right: 5px;
     }
 
-    #input-area {
-      margin-top: 10px;
+    .log-error {
+      color: #FF6B6B;
+    }
+
+    .log-warning {
+      color: #FFB347;
+    }
+
+    .log-success {
+      color: #00DD35;
+    }
+
+    .log-info {
+      color: #4ECDC4;
+    }
+
+    /* Input area */
+    .input-area {
       display: flex;
       align-items: center;
-      border-top: 1px solid #00FF41;
-      padding-top: 8px;
+      gap: 5px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 4px;
     }
 
-    #input-prompt {
+    .input-prompt {
       color: #00FF41;
-      margin-right: 5px;
       font-weight: bold;
+      font-size: 12px;
+      min-width: 15px;
     }
 
-    #command-input {
+    .command-input {
       flex: 1;
       background: transparent;
       border: none;
       color: #00FF41;
       font-family: 'Courier New', monospace;
-      font-size: 11px;
+      font-size: 12px;
       outline: none;
+      padding: 4px;
     }
 
-    #command-input::placeholder {
-      color: rgba(0, 255, 65, 0.5);
+    .command-input::placeholder {
+      color: rgba(0, 255, 65, 0.4);
     }
 
-    /* Theme-aware console styling for regular theme */
-    .regular-theme #console {
-      background: rgba(255, 255, 255, 0.95);
+    .command-input:focus {
+      background: rgba(0, 255, 65, 0.05);
+    }
+
+    /* Regular theme */
+    .regular-theme {
+      background: #f8fafc;
+      color: #1e293b;
+    }
+
+    .regular-theme body {
+      background: #f8fafc;
+    }
+
+    .regular-theme #console-toggle {
+      background: rgba(255, 255, 255, 0.9);
       border-color: #2563eb;
       color: #1e40af;
-      box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
     }
 
-    .regular-theme #console-header {
+    .regular-theme #console-toggle:hover {
+      background: rgba(37, 99, 235, 0.1);
+      box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+    }
+
+    .regular-theme .console-window {
+      background: rgba(255, 255, 255, 0.95);
+      border-color: #2563eb;
+      box-shadow: 0 0 30px rgba(37, 99, 235, 0.3);
       color: #1e40af;
+    }
+
+    .regular-theme .console-header {
+      background: rgba(37, 99, 235, 0.1);
       border-bottom-color: #2563eb;
     }
 
-    .regular-theme .log-entry {
+    .regular-theme .console-title {
+      color: #1e40af;
+    }
+
+    .regular-theme .console-btn {
+      background: rgba(37, 99, 235, 0.2);
+      border-color: #2563eb;
+      color: #1e40af;
+    }
+
+    .regular-theme .console-btn:hover {
+      background: rgba(37, 99, 235, 0.3);
+    }
+
+    .regular-theme .log-display {
+      background: rgba(248, 250, 252, 0.5);
+      border-color: rgba(37, 99, 235, 0.2);
       color: #374151;
+    }
+
+    .regular-theme .log-display::-webkit-scrollbar-track {
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .regular-theme .log-display::-webkit-scrollbar-thumb {
+      background: #2563eb;
     }
 
     .regular-theme .log-timestamp {
       color: #6b7280;
     }
 
-    .regular-theme #input-prompt {
+    .regular-theme .input-area {
+      background: rgba(248, 250, 252, 0.5);
+      border-color: rgba(37, 99, 235, 0.2);
+    }
+
+    .regular-theme .input-prompt {
       color: #1e40af;
     }
 
-    .regular-theme #command-input {
+    .regular-theme .command-input {
       color: #1e40af;
     }
 
-    .regular-theme #command-input::placeholder {
-      color: rgba(30, 64, 175, 0.5);
+    .regular-theme .command-input::placeholder {
+      color: rgba(30, 64, 175, 0.4);
     }
 
-    .regular-theme #log-display::-webkit-scrollbar-track {
-      background: rgba(37, 99, 235, 0.1);
+    .regular-theme .command-input:focus {
+      background: rgba(37, 99, 235, 0.05);
     }
 
-    .regular-theme #log-display::-webkit-scrollbar-thumb {
-      background: #2563eb;
+    /* Regular theme log levels */
+    .regular-theme .log-error {
+      color: #dc2626;
     }
 
-    /* Regular theme styling for toggle button */
-    .regular-theme #console-toggle {
-      border-color: #2563eb;
-      color: #1e40af;
-      background: rgba(255, 255, 255, 0.9);
+    .regular-theme .log-warning {
+      color: #d97706;
     }
 
-    .regular-theme #console-toggle:hover {
-      background: rgba(37, 99, 235, 0.1);
-      box-shadow: 0 0 15px rgba(37, 99, 235, 0.5);
+    .regular-theme .log-success {
+      color: #16a34a;
+    }
+
+    .regular-theme .log-info {
+      color: #0284c7;
+    }
+
+    /* Loading animation */
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00FF41;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      z-index: 2000;
+    }
+
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #00FF41;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 255, 65, 0.1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00FF41;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00DD35;
     }
   </style>
 
-  <!-- Correct 3D Force Graph script -->
+  <!-- External libraries - using only the required versions -->
   <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.77.0/dist/3d-force-graph.min.js"></script>
-  
-  <!-- Import map for ES6 modules -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
-        "three/examples/jsm/postprocessing/UnrealBloomPass.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/UnrealBloomPass.js",
-        "three/examples/jsm/postprocessing/EffectComposer.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/EffectComposer.js",
-        "three/examples/jsm/postprocessing/RenderPass.js": "https://unpkg.com/three@0.157.0/examples/jsm/postprocessing/RenderPass.js"
-      }
-    }
-  </script>
 </head>
 <body>
-  <div id="graph"></div>
+    <div id="graph-container">
+    <div id="graph"></div>
+  </div>
   
-  <!-- Console toggle button -->
+  <!-- Console toggle button (bottom-left) -->
   <button id="console-toggle" class="console-visible" title="Toggle Console">⚡</button>
   
-  <!-- Top-right console -->
-  <div id="console">
-    <div id="console-header">⚡ NERON CONSOLE</div>
-    <div id="log-display"></div>
-    <div id="input-area">
-      <span id="input-prompt">></span>
-      <input type="text" id="command-input" placeholder="Type 'init' to load graph, 'test' for demo..." />
+  <!-- Draggable console window -->
+  <div id="console-window" class="console-window">
+    <div id="console-header" class="console-header">
+      <span class="console-title">⚡ NERON CONSOLE v2.0</span>
+      <div class="console-controls">
+        <button id="console-close" class="console-btn">×</button>
+      </div>
+    </div>
+    <div id="console-content" class="console-content">
+      <div id="log-display" class="log-display"></div>
+      <div id="input-area" class="input-area">
+        <span id="input-prompt" class="input-prompt">></span>
+        <input type="text" id="command-input" class="command-input" placeholder="Type 'help' for commands..." />
+      </div>
     </div>
   </div>
 
   <script>
-    // Global state
-    var currentTheme = 'matrix';
-    var currentGraph = null;
-    var isGraphLoaded = false;
-
-    // Comprehensive color mapping based on test.json data
-    var colorMappings = {
-      matrix: {
-        // Matrix theme: Green variations with tech feel
-        'Project': '#00FF41',           // Bright green for projects
-        'project': '#00FF41',           // Same for lowercase
-        'Bug Fix': '#FF4444',           // Red for bug fixes
-        'Bug': '#FF6666',               // Lighter red for bugs
-        'Feature': '#00DD35',           // Green for features
-        'Component': '#00BB29',         // Darker green for components
-        'codebase_component': '#00BB29', // Same for codebase components
-        'Architecture': '#44FF44',      // Light green for architecture
-        'Infrastructure': '#00AA22',    // Infrastructure green
-        'Configuration': '#66FF66',     // Config green
-        'Environment': '#33DD33',       // Environment green
-        'Implementation': '#00CC30',    // Implementation green
-        'Strategy': '#FFAA00',          // Orange for strategy
-        'Decision': '#FF8800',          // Orange for decisions
-        'Process': '#AAFF00',           // Yellow-green for process
-        'Roadmap': '#FFFF00',           // Yellow for roadmap
-        'milestone': '#FFCC00',         // Gold for milestones
-        'Documentation': '#CCFFCC',     // Light green for docs
-        'Script': '#99FF99',            // Script green
-        'Resource': '#77FF77',          // Resource green
-        'Domain': '#55FF55',            // Domain green
-        'Cleanup': '#FF9900',           // Orange cleanup
-        'Development Phase': '#FFDD00', // Dev phase yellow
-        'deliverable_summary': '#AADD00', // Summary yellow-green
-        'default': '#00FF41'            // Default matrix green
-      },
-      regular: {
-        // Regular theme: Vibrant multicolored palette
-        'Project': '#3b82f6',           // Blue for projects
-        'project': '#3b82f6',           // Same for lowercase
-        'Bug Fix': '#ef4444',           // Red for bug fixes
-        'Bug': '#f87171',               // Lighter red for bugs
-        'Feature': '#10b981',           // Emerald for features
-        'Component': '#8b5cf6',         // Purple for components
-        'codebase_component': '#8b5cf6', // Same for codebase components
-        'Architecture': '#06b6d4',      // Cyan for architecture
-        'Infrastructure': '#64748b',    // Slate for infrastructure
-        'Configuration': '#84cc16',     // Lime for configuration
-        'Environment': '#22c55e',       // Green for environment
-        'Implementation': '#14b8a6',    // Teal for implementation
-        'Strategy': '#f59e0b',          // Amber for strategy
-        'Decision': '#f97316',          // Orange for decisions
-        'Process': '#ec4899',           // Pink for process
-        'Roadmap': '#eab308',           // Yellow for roadmap
-        'milestone': '#fbbf24',         // Gold for milestones
-        'Documentation': '#6366f1',     // Indigo for docs
-        'Script': '#a855f7',            // Violet for scripts
-        'Resource': '#06b6d4',          // Cyan for resources
-        'Domain': '#059669',            // Emerald for domain
-        'Cleanup': '#f97316',           // Orange cleanup
-        'Development Phase': '#d946ef', // Fuchsia dev phase
-        'deliverable_summary': '#8b5cf6', // Purple summary
-        'default': '#6b7280'            // Default gray
-      }
-    };
-
-    // Get color for node type based on current theme
-    function getNodeColor(nodeType, theme) {
-      var themeColors = colorMappings[theme] || colorMappings.regular;
-      return themeColors[nodeType] || themeColors.default;
-    }
-
-    // Simplified - complex bloom effects removed for debugging
-
-    // Hardcoded test data
-    var testGraphData = {
-      nodes: [
-        { id: 'node1', name: 'Test Project', type: 'Project', val: 10 },
-        { id: 'node2', name: 'Bug Fix Issue', type: 'Bug Fix', val: 8 },
-        { id: 'node3', name: 'New Feature', type: 'Feature', val: 15 },
-        { id: 'node4', name: 'Core Component', type: 'Component', val: 6 },
-        { id: 'node5', name: 'System Architecture', type: 'Architecture', val: 12 },
-        { id: 'node6', name: 'Infrastructure Setup', type: 'Infrastructure', val: 9 },
-        { id: 'node7', name: 'Strategy Planning', type: 'Strategy', val: 11 }
-      ],
-      links: [
-        { source: 'node1', target: 'node2' },
-        { source: 'node1', target: 'node3' },
-        { source: 'node2', target: 'node4' },
-        { source: 'node3', target: 'node5' },
-        { source: 'node4', target: 'node6' },
-        { source: 'node5', target: 'node7' },
-        { source: 'node6', target: 'node1' }
-      ]
-    };
-
-    // Logging function that sends to React Native console
-    function logToExpo(message, type) {
-      type = type || 'info';
-      var timestamp = new Date().toLocaleTimeString();
-      var logMessage = '[' + timestamp + '] ' + message;
-      
-      // Send to React Native console
+    // Initialize the application when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        console.log('🔧 Initializing Neron Graph Engine v2.0...');
+        console.log('🌐 Environment:', window.ReactNativeWebView ? 'React Native' : 'Web Browser');
+        
+        // Logger class - inline implementation
+        class Logger {
+          constructor() {
+            this.levels = { ERROR: 0, WARN: 1, INFO: 2, DEBUG: 3 };
+            this.currentLevel = this.levels.INFO;
+            this.prefix = '[NeronEngine]';
+            this.startTime = Date.now();
+            this.sessionId = Math.random().toString(36).substring(2, 15);
+            console.log(`${this.prefix} Logger initialized - Session: ${this.sessionId}`);
+          }
+          
+          formatMessage(level, message, data = null) {
+            const timestamp = new Date().toISOString();
+            const uptime = Date.now() - this.startTime;
+            const baseMessage = `${this.prefix} [${level}] [${timestamp}] [+${uptime}ms] ${message}`;
+            return { baseMessage, data };
+          }
+          
+          log(level, message, data = null) {
+            if (this.levels[level] > this.currentLevel) return;
+            
+            const { baseMessage, data: logData } = this.formatMessage(level, message, data);
+            
+            switch (level) {
+              case 'ERROR': console.error(baseMessage, logData || ''); break;
+              case 'WARN': console.warn(baseMessage, logData || ''); break;
+              case 'INFO': console.info(baseMessage, logData || ''); break;
+              case 'DEBUG': console.debug(baseMessage, logData || ''); break;
+              default: console.log(baseMessage, logData || '');
+            }
+            
+            // Send to React Native if available
+            if (window.ReactNativeWebView) {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'log', level: level.toLowerCase(), message: baseMessage, data: logData, sessionId: this.sessionId
+                }));
+              } catch (e) {
+                console.error(`${this.prefix} Failed to send log to React Native:`, e);
+              }
+            }
+          }
+          
+          error(message, data = null) { this.log('ERROR', message, data); }
+          warn(message, data = null) { this.log('WARN', message, data); }
+          info(message, data = null) { this.log('INFO', message, data); }
+          debug(message, data = null) { this.log('DEBUG', message, data); }
+          success(message, data = null) {
+            const { baseMessage, data: logData } = this.formatMessage('SUCCESS', message, data);
+            console.log(`%c${baseMessage}`, 'color: #00DD35', logData || '');
       if (window.ReactNativeWebView) {
         try {
           window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'log',
-            level: type,
-            message: logMessage
+                  type: 'log', level: 'success', message: baseMessage, data: logData, sessionId: this.sessionId
           }));
         } catch (e) {
-          console.error('Failed to send message to React Native:', e);
-        }
-      }
-      
-      // Add to in-app console for visual feedback
-      var logDisplay = document.getElementById('log-display');
-      if (logDisplay) {
-        var logEntry = document.createElement('div');
-        logEntry.className = 'log-entry';
-        logEntry.innerHTML = '<span class="log-timestamp">[' + timestamp + ']</span> ' + message;
-        logDisplay.appendChild(logEntry);
-        logDisplay.scrollTop = logDisplay.scrollHeight;
-        
-        // Keep max 50 entries for performance
-        while (logDisplay.children.length > 50) {
-          logDisplay.removeChild(logDisplay.firstChild);
-        }
-      }
-    }
-
-    // Check if libraries are loaded
-    function checkLibrariesStatus() {
-      var threeAvailable = typeof window.THREE !== 'undefined';
-      var forceGraphAvailable = typeof window.ForceGraph3D !== 'undefined';
-      
-      logToExpo((threeAvailable ? '✅' : '❌') + ' THREE.js: ' + (threeAvailable ? 'Available' : 'Missing'));
-      logToExpo((forceGraphAvailable ? '✅' : '❌') + ' ForceGraph3D: ' + (forceGraphAvailable ? 'Available' : 'Missing'));
-      
-      var allReady = threeAvailable && forceGraphAvailable;
-      logToExpo('📊 Libraries ready: ' + (allReady ? 'YES' : 'NO'));
-      
-      return allReady;
-    }
-
-    // Theme management
-    function applyTheme(theme) {
-      currentTheme = theme;
-      var body = document.body;
-      var prompt = document.getElementById('input-prompt');
-      
-      if (theme === 'regular') {
-        body.classList.add('regular-theme');
-        if (prompt) prompt.textContent = '$';
-        logToExpo('🎨 Theme switched to REGULAR');
-      } else {
-        body.classList.remove('regular-theme');
-        if (prompt) prompt.textContent = '>';
-        logToExpo('🎨 Theme switched to MATRIX');
-      }
-      
-      // Re-render graph with new theme colors if graph is loaded
-      if (isGraphLoaded && currentGraph) {
-        logToExpo('🔄 Updating graph colors for new theme...');
-        updateGraphColors();
-      }
-    }
-
-    // Update existing graph colors based on current theme
-    function updateGraphColors() {
-      if (!currentGraph) return;
-      
-      try {
-        // Better background colors - pure black for matrix, dark blue-gray for regular
-        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
-        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
-        
-        // Update graph colors
-        currentGraph
-          .backgroundColor(backgroundColor)
-          .nodeColor(function(node) {
-            return getNodeColor(node.type, currentTheme);
-          })
-          .linkColor(function() { return linkColor; });
-        
-        // Simplified - no bloom effects applied
+                console.error(`${this.prefix} Failed to send log to React Native:`, e);
+              }
+            }
+          }
           
-        logToExpo('✅ Graph colors updated for ' + currentTheme + ' theme');
+          setLevel(level) {
+            if (this.levels[level] !== undefined) {
+              this.currentLevel = this.levels[level];
+              this.info(`Log level set to: ${level}`);
+            } else {
+              this.warn(`Invalid log level: ${level}`);
+            }
+          }
+        }
+
+        // Create global logger
+        window.Logger = new Logger();
+
+        // Simple NeronGraphEngine initialization
+        window.Logger.info('🚀 Neron Graph Engine loading...');
+        
+        // Check libraries
+        const threeAvailable = typeof window.THREE !== 'undefined';
+        const forceGraphAvailable = typeof window.ForceGraph3D !== 'undefined';
+        
+        window.Logger.info(`Libraries check: THREE.js ${threeAvailable ? '✅' : '❌'}, ForceGraph3D ${forceGraphAvailable ? '✅' : '❌'}`);
+        
+        if (!threeAvailable || !forceGraphAvailable) {
+          throw new Error('Required libraries not available');
+        }
+
+        // Initialize console functionality
+        initializeConsole();
+        
+        // Ensure console is visible
+        showConsole();
+        
+        window.Logger.success('✅ Neron Graph Engine initialized successfully');
+        
+        // Add welcome message to console with timestamp to verify updates
+        const buildTime = new Date().toISOString();
+        addLogEntry('🚀 Neron Graph Engine v2.0 initialized', 'success');
+        addLogEntry('💻 Console: Drag header to move, × to hide', 'info');
+        addLogEntry(`🕒 Build: ${buildTime}`, 'info');
+        addLogEntry('Type "help" for available commands', 'info');
       } catch (error) {
-        logToExpo('❌ Failed to update graph colors: ' + error.message, 'error');
+        console.error('❌ Failed to initialize Neron Graph Engine:', error);
+        alert('Failed to initialize application. Check console for details.');
       }
-    }
+    });
 
-    // Command handling
-    function handleCommand(command) {
-      var cmd = command.trim().toLowerCase();
-      logToExpo('> ' + command);
+    // Console functionality
+    let isConsoleVisible = true;
+
+    function initializeConsole() {
+      // Console toggle functionality
+      const toggleButton = document.getElementById('console-toggle');
+      const consoleWindow = document.getElementById('console-window');
       
-      if (cmd === 'init') {
-        loadExternalGraph();
-      } else if (cmd === 'test') {
-        createTestGraph();
-      } else if (cmd === 'shutdown') {
-        shutdownGraph();
-      } else if (cmd === 'check-libs') {
-        checkLibrariesStatus();
-      } else if (cmd === 'theme') {
-        switchTheme();
-      } else if (cmd === 'help') {
-        logToExpo('📖 Available commands:');
-        logToExpo('   • test - Create test graph with diverse node types');
-        logToExpo('   • init - Load external graph from test.json');
-        logToExpo('   • theme - Switch between Matrix/Regular themes');
-        logToExpo('   • shutdown - Clear graph');
-        logToExpo('   • check-libs - Check library status');
-        logToExpo('   • help - Show this help');
-      } else if (cmd === '') {
-        // Do nothing for empty command
+      if (toggleButton) {
+        toggleButton.addEventListener('click', function(e) {
+          e.stopPropagation();
+          toggleConsole();
+        });
+      }
+
+      // Console controls
+      const closeBtn = document.getElementById('console-close');
+      
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          hideConsole();
+        });
+      }
+
+      // Setup drag functionality
+      setupDragFunctionality();
+      
+      // Setup command input
+      setupCommandInput();
+      
+      window.Logger.info('Console initialized successfully');
+    }
+
+    function toggleConsole() {
+      if (isConsoleVisible) {
+        hideConsole();
       } else {
-        logToExpo('❓ Unknown command: "' + command + '". Type "help" for available commands.');
+        showConsole();
       }
     }
 
-    // Switch between themes
-    function switchTheme() {
-      var newTheme = currentTheme === 'matrix' ? 'regular' : 'matrix';
-      logToExpo('🔄 Switching from ' + currentTheme + ' to ' + newTheme + ' theme...');
-      applyTheme(newTheme);
+    function showConsole() {
+      const consoleWindow = document.getElementById('console-window');
+      const toggleButton = document.getElementById('console-toggle');
+      
+      isConsoleVisible = true;
+      consoleWindow.classList.remove('hidden');
+      toggleButton.innerHTML = '⚡';
+      toggleButton.title = 'Hide Console';
+      
+      // Focus on input
+      setTimeout(() => {
+        const commandInput = document.getElementById('command-input');
+        if (commandInput) commandInput.focus();
+      }, 100);
+    }
+
+    function hideConsole() {
+      const consoleWindow = document.getElementById('console-window');
+      const toggleButton = document.getElementById('console-toggle');
+      
+      isConsoleVisible = false;
+      consoleWindow.classList.add('hidden');
+      toggleButton.innerHTML = '👁️';
+      toggleButton.title = 'Show Console';
+    }
+
+    // Minimize functionality removed - only hide/show console
+
+    function setupDragFunctionality() {
+      const consoleWindow = document.getElementById('console-window');
+      const consoleHeader = document.getElementById('console-header');
+      let isDragging = false;
+
+      consoleHeader.addEventListener('mousedown', function(e) {
+        if (e.target.classList.contains('console-btn')) return;
+        
+        isDragging = true;
+        consoleWindow.classList.add('dragging');
+        
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const rect = consoleWindow.getBoundingClientRect();
+        const startLeft = rect.left;
+        const startTop = rect.top;
+
+        function handleMouseMove(e) {
+          if (!isDragging) return;
+          
+          const deltaX = e.clientX - startX;
+          const deltaY = e.clientY - startY;
+          let newLeft = startLeft + deltaX;
+          let newTop = startTop + deltaY;
+          
+          // Boundary constraints
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+          const consoleWidth = consoleWindow.offsetWidth;
+          const consoleHeight = consoleWindow.offsetHeight;
+          
+          newLeft = Math.max(0, Math.min(windowWidth - consoleWidth, newLeft));
+          newTop = Math.max(0, Math.min(windowHeight - consoleHeight, newTop));
+          
+          consoleWindow.style.left = `${newLeft}px`;
+          consoleWindow.style.top = `${newTop}px`;
+          consoleWindow.style.right = 'auto';
+          consoleWindow.style.bottom = 'auto';
+        }
+
+        function handleMouseUp() {
+          isDragging = false;
+          consoleWindow.classList.remove('dragging');
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        e.preventDefault();
+      });
+    }
+
+    function setupCommandInput() {
+      const commandInput = document.getElementById('command-input');
+      if (!commandInput) return;
+
+      commandInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const command = this.value;
+          if (command.trim()) {
+            handleCommand(command);
+            this.value = '';
+          }
+        }
+      });
+    }
+
+    function handleCommand(command) {
+      const cmd = command.trim().toLowerCase();
+      addLogEntry(`> ${command}`, 'info');
+      
+      switch (cmd) {
+        case 'help':
+          showHelp();
+          break;
+        case 'test':
+          createTestGraph();
+          break;
+        case 'init':
+        loadExternalGraph();
+          break;
+        case 'theme':
+          toggleTheme();
+          break;
+        case 'clear':
+          clearConsole();
+          break;
+        case 'status':
+          showStatus();
+          break;
+        default:
+          addLogEntry(`Unknown command: "${command}". Type "help" for available commands.`, 'error');
+      }
+    }
+
+    function showHelp() {
+      addLogEntry('📖 Available Commands:', 'info');
+      addLogEntry('  • help - Show available commands', 'info');
+      addLogEntry('  • test - Create test graph with sample data', 'info');
+      addLogEntry('  • init - Load graph data from React Native', 'info');
+      addLogEntry('  • theme - Toggle between Matrix and Regular themes', 'info');
+      addLogEntry('  • clear - Clear console log', 'info');
+      addLogEntry('  • status - Show system status', 'info');
     }
 
     function createTestGraph() {
-      logToExpo('🧪 Creating test graph with hardcoded data...');
-      
-      if (!checkLibrariesStatus()) {
-        logToExpo('❌ Cannot create graph - libraries not ready');
-        return;
-      }
-      
       try {
-        var graphElement = document.getElementById('graph');
+        addLogEntry('🧪 Creating test graph...', 'info');
+        
+        // Simple test data
+        const testData = {
+          nodes: [
+            { id: 'node1', name: 'Test Project', type: 'Project', val: 10 },
+            { id: 'node2', name: 'Bug Fix Issue', type: 'Bug Fix', val: 8 },
+            { id: 'node3', name: 'New Feature', type: 'Feature', val: 15 }
+          ],
+          links: [
+            { source: 'node1', target: 'node2' },
+            { source: 'node1', target: 'node3' }
+          ]
+        };
+
+        const graphElement = document.getElementById('graph');
         graphElement.innerHTML = '';
         
-        // Apply basic theme colors
-        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
-        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
-        
-        console.log('🔧 HTML DEBUG: Creating basic test graph...');
-        
-        var Graph = window.ForceGraph3D()(graphElement)
-          .graphData(testGraphData)
-          .backgroundColor(backgroundColor)
-          .nodeColor(function(node) {
-            return getNodeColor(node.type, currentTheme);
-          })
-          .linkColor(function() { return linkColor; })
+        const Graph = window.ForceGraph3D()(graphElement)
+          .graphData(testData)
+          .backgroundColor('#000000')
+          .nodeColor(() => '#00FF41')
+          .linkColor(() => '#004d1a')
           .nodeLabel('name')
-          .linkLabel(function(link) { return link.source + ' → ' + link.target; })
-          .onNodeClick(function(node) {
-            console.log('🔧 HTML DEBUG: Test node clicked:', node.name);
-            logToExpo('🖱️ Node clicked: ' + node.name + ' (' + node.type + ')');
-          })
-          .enableNodeDrag(true)
-          .onEngineStop(function() {
-            console.log('🔧 HTML DEBUG: Test graph engine stopped');
-            logToExpo('🎯 BASIC test graph layout stabilized');
+          .onNodeClick(node => {
+            addLogEntry(`🖱️ Node clicked: ${node.name}`, 'info');
           });
-        
-        currentGraph = Graph;
-        isGraphLoaded = true;
-        
-        logToExpo('✅ Test graph created with ' + currentTheme + ' theme colors!');
-        logToExpo('🎮 Graph controls: drag to rotate, scroll to zoom, click nodes');
+
+        addLogEntry('✅ Test graph created successfully', 'success');
         
       } catch (error) {
-        logToExpo('❌ Test graph creation failed: ' + error.message, 'error');
+        addLogEntry(`❌ Failed to create test graph: ${error.message}`, 'error');
       }
     }
 
     function loadExternalGraph() {
-      logToExpo('🔄 Loading external graph data...');
+      addLogEntry('📡 Requesting graph data from React Native...', 'info');
       
-      if (!checkLibrariesStatus()) {
-        logToExpo('❌ Cannot load graph - libraries not ready');
-        return;
-      }
-      
-      // Send message to React Native to get graph data
       if (window.ReactNativeWebView) {
         try {
-          logToExpo('📡 Requesting graph data from React Native...');
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'request_graph_data'
           }));
+          addLogEntry('✅ Request sent successfully', 'success');
         } catch (e) {
-          logToExpo('❌ Failed to request graph data: ' + e.message, 'error');
+          addLogEntry(`❌ Failed to request graph data: ${e.message}`, 'error');
         }
       } else {
-        logToExpo('❌ Cannot load graph: Not running in React Native WebView');
+        addLogEntry('❌ Not running in React Native WebView', 'error');
       }
     }
 
-    function shutdownGraph() {
-      logToExpo('🔄 Shutting down graph...');
+    function toggleTheme() {
+      const body = document.body;
+      const isRegular = body.classList.contains('regular-theme');
       
-      currentGraph = null;
-      isGraphLoaded = false;
-      
-      // Clear the graph display
-      var graphElement = document.getElementById('graph');
-      if (graphElement) {
-        graphElement.innerHTML = '';
-      }
-      
-      logToExpo('✅ Graph shutdown complete');
-    }
-
-    // Input handling
-    function setupInputHandling() {
-      var commandInput = document.getElementById('command-input');
-      if (commandInput) {
-        commandInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            var command = this.value;
-            if (command.trim()) {
-              handleCommand(command);
-              this.value = '';
-            }
-          }
-        });
-        
-        // Blur input when clicking outside console
-        document.addEventListener('click', function(e) {
-          var console = document.getElementById('console');
-          if (console && !console.contains(e.target)) {
-            commandInput.blur();
-          }
-        });
-        
-        logToExpo('✅ Input handling setup complete');
+      if (isRegular) {
+        body.classList.remove('regular-theme');
+        addLogEntry('🎨 Switched to Matrix theme', 'success');
       } else {
-        logToExpo('❌ Could not find command input element');
+        body.classList.add('regular-theme');
+        addLogEntry('🎨 Switched to Regular theme', 'success');
       }
     }
 
-    // Console toggle functionality
-    function setupConsoleToggle() {
-      var toggleButton = document.getElementById('console-toggle');
-      var console = document.getElementById('console');
-      var isConsoleVisible = true;
-
-      if (toggleButton && console) {
-        toggleButton.addEventListener('click', function(e) {
-          e.stopPropagation();
-          
-          if (isConsoleVisible) {
-            // Hide console
-            console.classList.add('hidden');
-            toggleButton.classList.remove('console-visible');
-            toggleButton.classList.add('console-hidden');
-            toggleButton.innerHTML = '👁️';
-            toggleButton.title = 'Show Console';
-            isConsoleVisible = false;
-            logToExpo('🙈 Console hidden');
-          } else {
-            // Show console
-            console.classList.remove('hidden');
-            toggleButton.classList.remove('console-hidden');
-            toggleButton.classList.add('console-visible');
-            toggleButton.innerHTML = '⚡';
-            toggleButton.title = 'Hide Console';
-            isConsoleVisible = true;
-            logToExpo('👁️ Console visible');
-          }
-        });
-        
-        logToExpo('✅ Console toggle setup complete');
-      } else {
-        logToExpo('❌ Could not find console toggle elements');
+    function clearConsole() {
+      const logDisplay = document.getElementById('log-display');
+      if (logDisplay) {
+        logDisplay.innerHTML = '';
+        addLogEntry('Console cleared', 'success');
       }
     }
 
-    // Message handling from React Native
+    function showStatus() {
+      addLogEntry('📊 System Status:', 'info');
+      addLogEntry(`  • Theme: ${document.body.classList.contains('regular-theme') ? 'Regular' : 'Matrix'}`, 'info');
+      addLogEntry(`  • Libraries: THREE.js ${typeof window.THREE !== 'undefined' ? '✅' : '❌'}, ForceGraph3D ${typeof window.ForceGraph3D !== 'undefined' ? '✅' : '❌'}`, 'info');
+    }
+
+    function addLogEntry(message, level = 'info') {
+      const logDisplay = document.getElementById('log-display');
+      if (!logDisplay) return;
+      
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${level}`;
+      
+      logEntry.innerHTML = `
+        <span class="log-timestamp">[${timestamp}]</span>
+        <span class="log-message">${message}</span>
+      `;
+      
+      logDisplay.appendChild(logEntry);
+      logDisplay.scrollTop = logDisplay.scrollHeight;
+      
+      // Keep max 100 entries
+      while (logDisplay.children.length > 100) {
+        logDisplay.removeChild(logDisplay.firstChild);
+      }
+    }
+
+    // Handle messages from React Native
     window.addEventListener('message', function(event) {
       try {
-        var message = JSON.parse(event.data);
+        const message = JSON.parse(event.data);
+        console.log('Received message from React Native:', message);
         
-        if (message.type === 'updateTheme') {
-          applyTheme(message.theme);
-        } else if (message.type === 'loadGraphData') {
-          displayExternalGraph(message.data, message.theme);
-        } else if (message.type === 'clearGraph') {
-          shutdownGraph();
+        switch (message.type) {
+          case 'updateTheme':
+            const body = document.body;
+            if (message.theme === 'regular') {
+              body.classList.add('regular-theme');
+            } else {
+              body.classList.remove('regular-theme');
+            }
+            addLogEntry(`🎨 Theme updated to: ${message.theme}`, 'success');
+            break;
+            
+          case 'loadGraphData':
+            // Handle graph data loading
+            addLogEntry('📊 Received graph data from React Native', 'success');
+            break;
+            
+          case 'clearGraph':
+            const graphElement = document.getElementById('graph');
+            if (graphElement) {
+              graphElement.innerHTML = '';
+              addLogEntry('🔄 Graph cleared', 'info');
+            }
+            break;
         }
       } catch (error) {
-        logToExpo('❌ Message parsing error: ' + error.message, 'error');
+        console.error('Failed to handle React Native message:', error);
       }
     });
 
-    // Display external graph data
-    function displayExternalGraph(data, theme) {
-      logToExpo('🎯 Displaying external graph...');
-      logToExpo('📊 Entities: ' + data.entities.length + ', Relations: ' + data.relations.length);
-      
-      if (!checkLibrariesStatus()) {
-        logToExpo('❌ Libraries not ready for graph display');
-        return;
-      }
-      
-      try {
-        // Convert entities/relations structure to nodes/links format
-        var nodes = data.entities.map(function(entity) {
-          return {
-            id: entity.id || entity.name,
-            name: entity.name,
-            type: entity.type,
-            val: entity.val || Math.min(entity.observations.length * 2 + 5, 20),
-            observations: entity.observations
-          };
-        });
-        
-        var links = data.relations.map(function(relation) {
-          return {
-            source: relation.source,
-            target: relation.target,
-            relationType: relation.relationType
-          };
-        });
-        
-        var graphData = { nodes: nodes, links: links };
-        
-        logToExpo('📊 Converted to graph format: ' + graphData.nodes.length + ' nodes, ' + graphData.links.length + ' links');
-        
-        // Apply theme colors
-        var backgroundColor = currentTheme === 'matrix' ? '#000003' : '#f8fafc';
-        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
-        
-        // Simplified - no bloom state management
-        
-        // Apply better theme colors
-        var backgroundColor = currentTheme === 'matrix' ? '#000000' : '#1e293b';
-        var linkColor = currentTheme === 'matrix' ? '#004d1a' : '#64748b';
-        
-        // Clear and create graph
-        var graphElement = document.getElementById('graph');
-        graphElement.innerHTML = '';
-        
-        var Graph = window.ForceGraph3D()(graphElement)
-          .graphData(graphData)
-          .backgroundColor(backgroundColor)
-          .nodeColor(function(node) {
-            return getNodeColor(node.type, currentTheme);
-          })
-          .linkColor(function() { return linkColor; })
-          .nodeLabel('name')
-          .linkLabel(function(link) { return link.source + ' → ' + link.target; })
-          .onNodeClick(function(node) {
-            logToExpo('🖱️ Node clicked: ' + node.name + ' (' + node.type + ')');
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'nodeClicked',
-                node: node,
-                allData: data
-              }));
-            }
-          })
-          .enableNodeDrag(true)
-          .onEngineStop(function() {
-            console.log('🔧 HTML DEBUG: External graph engine stopped');
-            logToExpo('🎯 BASIC external graph layout stabilized');
-          });
-        
-        currentGraph = Graph;
-        isGraphLoaded = true;
-        
-        logToExpo('✅ External graph rendered with ' + currentTheme + ' theme colors!');
-        
-      } catch (error) {
-        logToExpo('❌ External graph display error: ' + error.message, 'error');
-      }
-    }
-
-    // Initialize everything when DOM is ready
-    function initialize() {
-      console.log('🔧 HTML DEBUG: HTML initialize() called');
-      logToExpo('🚀 BASIC Neron Graph Engine initialized (simplified for debugging)');
-      logToExpo('💡 Commands: "test" for demo, "theme" to switch colors, "init" for external graph');
-      
-      // Apply initial Matrix theme
-      applyTheme('matrix');
-      
-      // Setup input handling
-      setupInputHandling();
-      
-      // Setup console toggle
-      setupConsoleToggle();
-      
-      // Check libraries after a short delay
-      setTimeout(function() {
-        checkLibrariesStatus();
-      }, 500);
-    }
-
-    // Wait for DOM to be ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initialize);
-    } else {
-      initialize();
-    }
-
-    // Test script execution
-    logToExpo('🔥 Script loaded successfully!');
+    console.log('🔧 Neron Graph Engine script loaded successfully');
   </script>
 </body>
 </html> 
