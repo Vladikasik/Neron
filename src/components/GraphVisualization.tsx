@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, Alert, Text, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Asset } from 'expo-asset';
 import { Neo4jData } from '../utils/dataTransformer';
@@ -829,6 +829,7 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
   const webViewRef = useRef<WebView>(null);
   const [webViewUrl, setWebViewUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   // Get HTML file path
   useEffect(() => {
@@ -840,8 +841,10 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
         const uri = asset.localUri || asset.uri;
         console.log('📱 MOBILE: HTML asset loaded successfully:', uri);
         setWebViewUrl(uri);
+        setHasError(false);
       } catch (error) {
         console.error('📱 MOBILE ERROR: Failed to load HTML asset:', error);
+        setHasError(true);
         Alert.alert('Error', 'Failed to load graph viewer');
       }
     };
@@ -851,7 +854,7 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
 
   // Send theme updates to WebView
   useEffect(() => {
-    if (webViewRef.current) {
+    if (webViewRef.current && !isLoading) {
       const message = {
         type: 'updateTheme',
         theme: theme.type
@@ -863,7 +866,7 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
         webViewRef.current?.postMessage(JSON.stringify(message));
       }, 1000);
     }
-  }, [theme.type]);
+  }, [theme.type, isLoading]);
 
   // Transform Neo4j data for the graph
   const transformDataForGraph = (neo4jData: Neo4jData) => {
@@ -942,6 +945,26 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
           }
           break;
 
+        case 'webgl_error':
+          console.error('📱 WEBVIEW WebGL ERROR:', message.error);
+          Alert.alert(
+            'Graphics Error',
+            'Unable to initialize 3D graphics. This may be due to device limitations.',
+            [{ text: 'OK' }]
+          );
+          break;
+
+        case 'initialization_complete':
+          console.log('📱 WEBVIEW: Initialization completed successfully');
+          setIsLoading(false);
+          break;
+
+        case 'initialization_failed':
+          console.error('📱 WEBVIEW: Initialization failed:', message.error);
+          setHasError(true);
+          setIsLoading(false);
+          break;
+
         default:
           console.log(`📱 WEBVIEW: Unknown message type: ${message.type}`, message);
       }
@@ -952,7 +975,6 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
 
   const handleWebViewLoad = () => {
     console.log('📱 MOBILE: WebView loaded successfully');
-    setIsLoading(false);
     
     setTimeout(() => {
       const themeMessage = {
@@ -968,16 +990,52 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
     const { nativeEvent } = syntheticEvent;
     console.error('📱 MOBILE ERROR: WebView failed to load', nativeEvent);
     setIsLoading(false);
+    setHasError(true);
     Alert.alert('Error', 'Failed to load graph visualization');
   };
 
-  if (!webViewUrl) {
+  const handleWebViewLoadStart = () => {
+    console.log('📱 MOBILE: WebView load started');
+    setIsLoading(true);
+    setHasError(false);
+  };
+
+  const handleWebViewLoadEnd = () => {
+    console.log('📱 MOBILE: WebView load ended');
+    // Don't set loading to false here, wait for initialization_complete message
+  };
+
+  const retryLoad = () => {
+    setHasError(false);
+    setIsLoading(true);
+    webViewRef.current?.reload();
+  };
+
+  if (!webViewUrl && !hasError) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={[styles.loadingText, { color: theme.colors.text }]}>
           Initializing Graph Engine...
         </Text>
+      </View>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Text style={[styles.errorText, { color: theme.colors.error, textAlign: 'center', marginBottom: 20 }]}>
+          Failed to load graph visualization. This may be due to device limitations with 3D graphics.
+        </Text>
+        <TouchableOpacity 
+          style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} 
+          onPress={retryLoad}
+        >
+          <Text style={[styles.retryButtonText, { color: theme.colors.background }]}>
+            Retry
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -1000,23 +1058,80 @@ const MobileGraphVisualization: React.FC<GraphVisualizationProps> = ({
         onMessage={handleWebViewMessage}
         onLoad={handleWebViewLoad}
         onError={handleWebViewError}
+        onLoadStart={handleWebViewLoadStart}
+        onLoadEnd={handleWebViewLoadEnd}
+        
+        // iOS-specific WebView optimizations
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
+        allowsFullscreenVideo={false}
+        bounces={false}
+        scrollEnabled={false}
+        
+        // Enhanced JavaScript and security settings
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={false}
+        
+        // iOS WebView optimizations for graphics performance
+        allowsBackForwardNavigationGestures={false}
+        dataDetectorTypes="none"
+        textZoom={100}
+        
+        // Content handling optimizations
         scalesPageToFit={Platform.OS === 'android'}
         originWhitelist={['*']}
         mixedContentMode="compatibility"
-        allowsFullscreenVideo={false}
-        scrollEnabled={false}
-        bounces={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
         keyboardDisplayRequiresUserAction={false}
         hideKeyboardAccessoryView={true}
-        allowsBackForwardNavigationGestures={false}
+        
+        // iOS-specific performance settings
+        decelerationRate="normal"
+        automaticallyAdjustContentInsets={false}
+        contentInset={{ top: 0, left: 0, bottom: 0, right: 0 }}
+        
+        // iOS 14+ specific optimizations
+        limitsNavigationsToAppBoundDomains={false}
+        fraudulentWebsiteWarningEnabled={false}
+        
+        // WebGL and graphics optimizations
+        allowsAirPlayForMediaPlayback={false}
+        allowsPictureInPictureMediaPlayback={false}
+        
+        // Error recovery settings
+        onShouldStartLoadWithRequest={(request) => {
+          // Allow all requests for local assets
+          return true;
+        }}
+        
+        // Advanced rendering settings for iOS
+        renderError={(errorName) => (
+          <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+            <Text style={[styles.errorText, { color: theme.colors.error, textAlign: 'center', marginBottom: 20 }]}>
+              WebView Error: {errorName}
+            </Text>
+            <TouchableOpacity 
+              style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} 
+              onPress={retryLoad}
+            >
+              <Text style={[styles.retryButtonText, { color: theme.colors.background }]}>
+                Retry
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        renderLoading={() => (
+          <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.background }]}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+              Loading Neural Matrix...
+            </Text>
+          </View>
+        )}
       />
     </View>
   );
@@ -1063,5 +1178,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     padding: 20,
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 }); 

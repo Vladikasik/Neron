@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Neo4j Graph Visualization</title>
   
+  <!-- iOS-specific meta tags for better WebView compatibility -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  
+  <!-- Content Security Policy for iOS WebView compatibility -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline';">
+  
   <style>
     /* Base styling for the application */
     * {
@@ -18,17 +26,70 @@
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       user-select: none;
+      /* iOS-specific optimizations */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     #graph-container {
       position: relative;
       width: 100vw; 
-      height: 100vh; 
+      height: 100vh;
     }
 
     #graph {
       width: 100%;
       height: 100%;
+      /* iOS WebGL optimizations */
+      -webkit-backface-visibility: hidden;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+
+    /* Error display for iOS WebGL issues */
+    #error-display {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.1);
+      border: 1px solid #ff0000;
+      border-radius: 8px;
+      padding: 20px;
+      color: #ff0000;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      z-index: 2000;
+      display: none;
+    }
+
+    /* Loading indicator */
+    #loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00FF41;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #00FF41;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     /* Console toggle button in bottom-left */
@@ -94,8 +155,6 @@
       opacity: 0;
       pointer-events: none;
     }
-
-    /* Removed minimized styles - no longer needed */
 
     .console-window.dragging {
       transition: none;
@@ -367,34 +426,6 @@
       color: #0284c7;
     }
 
-    /* Loading animation */
-    .loading {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #00FF41;
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
-      z-index: 2000;
-    }
-
-    .loading::after {
-      content: '';
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #00FF41;
-      border-radius: 50%;
-      border-top-color: transparent;
-      animation: spin 1s linear infinite;
-      margin-left: 10px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
     /* Scrollbar styling */
     ::-webkit-scrollbar {
       width: 6px;
@@ -414,12 +445,25 @@
     }
   </style>
 
-  <!-- External libraries - using only the required versions -->
+  <!-- Load libraries from CDN - this works on iOS WebView -->
   <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.77.0/dist/3d-force-graph.min.js"></script>
 </head>
 <body>
-    <div id="graph-container">
+  <!-- Loading indicator -->
+  <div id="loading-indicator">
+    <div class="spinner"></div>
+    <span>Loading Neural Matrix...</span>
+  </div>
+
+  <!-- Error display -->
+  <div id="error-display">
+    <h3>⚠️ Graphics Error</h3>
+    <p id="error-message">Unable to initialize 3D graphics</p>
+    <button onclick="retryGraphInitialization()">Retry</button>
+  </div>
+
+  <div id="graph-container">
     <div id="graph"></div>
   </div>
   
@@ -444,11 +488,26 @@
   </div>
 
   <script>
+    // iOS WebGL context recovery and error handling
+    let graphInstance = null;
+    let isGraphInitialized = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
     // Initialize the application when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
       try {
         console.log('🔧 Initializing Neron Graph Engine v2.0...');
         console.log('🌐 Environment:', window.ReactNativeWebView ? 'React Native' : 'Web Browser');
+        console.log('📱 Platform:', navigator.platform);
+        console.log('🔧 User Agent:', navigator.userAgent);
+        
+        // Check if we're on iOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        console.log('🍎 iOS Detected:', isIOS);
+        
+        // Hide loading indicator initially
+        hideLoadingIndicator();
         
         // Logger class - inline implementation
         class Logger {
@@ -500,12 +559,12 @@
           success(message, data = null) {
             const { baseMessage, data: logData } = this.formatMessage('SUCCESS', message, data);
             console.log(`%c${baseMessage}`, 'color: #00DD35', logData || '');
-      if (window.ReactNativeWebView) {
-        try {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+            if (window.ReactNativeWebView) {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'log', level: 'success', message: baseMessage, data: logData, sessionId: this.sessionId
-          }));
-        } catch (e) {
+                }));
+              } catch (e) {
                 console.error(`${this.prefix} Failed to send log to React Native:`, e);
               }
             }
@@ -524,38 +583,153 @@
         // Create global logger
         window.Logger = new Logger();
 
-        // Simple NeronGraphEngine initialization
-        window.Logger.info('🚀 Neron Graph Engine loading...');
+        // Initialize with retry mechanism
+        initializeWithRetry();
         
-        // Check libraries
-        const threeAvailable = typeof window.THREE !== 'undefined';
-        const forceGraphAvailable = typeof window.ForceGraph3D !== 'undefined';
-        
-        window.Logger.info(`Libraries check: THREE.js ${threeAvailable ? '✅' : '❌'}, ForceGraph3D ${forceGraphAvailable ? '✅' : '❌'}`);
-        
-        if (!threeAvailable || !forceGraphAvailable) {
-          throw new Error('Required libraries not available');
-        }
-
-        // Initialize console functionality
-        initializeConsole();
-        
-        // Ensure console is visible
-        showConsole();
-        
-        window.Logger.success('✅ Neron Graph Engine initialized successfully');
-        
-        // Add welcome message to console with timestamp to verify updates
-        const buildTime = new Date().toISOString();
-        addLogEntry('🚀 Neron Graph Engine v2.0 initialized', 'success');
-        addLogEntry('💻 Console: Drag header to move, × to hide', 'info');
-        addLogEntry(`🕒 Build: ${buildTime}`, 'info');
-        addLogEntry('Type "help" for available commands', 'info');
       } catch (error) {
         console.error('❌ Failed to initialize Neron Graph Engine:', error);
-        alert('Failed to initialize application. Check console for details.');
+        showError('Failed to initialize application: ' + error.message);
+        
+        // Notify React Native of initialization failure
+        if (window.ReactNativeWebView) {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'initialization_failed',
+              error: error.message
+            }));
+          } catch (e) {
+            console.error('Failed to send initialization failure to React Native:', e);
+          }
+        }
       }
     });
+
+    // Retry mechanism for iOS WebGL issues
+    function initializeWithRetry() {
+      showLoadingIndicator();
+      
+      setTimeout(() => {
+        try {
+          // Simple NeronGraphEngine initialization
+          window.Logger.info('🚀 Neron Graph Engine loading...');
+          
+          // Check libraries with detailed error reporting
+          const libraryStatus = checkLibrariesWithDetails();
+          
+          if (!libraryStatus.allReady) {
+            throw new Error(`Libraries not ready: ${libraryStatus.missing.join(', ')}`);
+          }
+
+          // Initialize console functionality
+          initializeConsole();
+          
+          // Ensure console is visible
+          showConsole();
+          
+          window.Logger.success('✅ Neron Graph Engine initialized successfully');
+          
+          // Add welcome message to console with timestamp to verify updates
+          const buildTime = new Date().toISOString();
+          addLogEntry('🚀 Neron Graph Engine v2.0 initialized', 'success');
+          addLogEntry('💻 Console: Drag header to move, × to hide', 'info');
+          addLogEntry(`🕒 Build: ${buildTime}`, 'info');
+          addLogEntry('Type "help" for available commands', 'info');
+          
+          isGraphInitialized = true;
+          hideLoadingIndicator();
+          
+          // Notify React Native of successful initialization
+          if (window.ReactNativeWebView) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'initialization_complete'
+              }));
+            } catch (e) {
+              console.error('Failed to send initialization success to React Native:', e);
+            }
+          }
+          
+        } catch (error) {
+          console.error('❌ Initialization failed:', error);
+          
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            window.Logger.warn(`Retrying initialization (${retryCount}/${MAX_RETRIES})...`);
+            setTimeout(() => initializeWithRetry(), 2000);
+          } else {
+            hideLoadingIndicator();
+            showError('Failed to initialize after multiple attempts. This may be due to iOS WebGL limitations.');
+            
+            // Still show console for debugging
+            try {
+              initializeConsole();
+              showConsole();
+              addLogEntry('❌ Graphics initialization failed', 'error');
+              addLogEntry('💡 Console available for debugging', 'info');
+            } catch (consoleError) {
+              console.error('Console initialization also failed:', consoleError);
+            }
+          }
+        }
+      }, 1000);
+    }
+
+    // Enhanced library checking with detailed error reporting
+    function checkLibrariesWithDetails() {
+      const checks = [
+        { name: 'THREE.js', available: typeof window.THREE !== 'undefined', global: 'THREE' },
+        { name: 'ForceGraph3D', available: typeof window.ForceGraph3D !== 'undefined', global: 'ForceGraph3D' }
+      ];
+      
+      const missing = checks.filter(check => !check.available).map(check => check.name);
+      const allReady = missing.length === 0;
+      
+      checks.forEach(check => {
+        const status = check.available ? '✅' : '❌';
+        window.Logger.info(`${status} ${check.name}: ${check.available ? 'Available' : 'Missing'}`);
+        if (!check.available) {
+          console.error(`${check.global} is not defined. Check if ${check.name} script loaded correctly.`);
+        }
+      });
+      
+      window.Logger.info(`📊 Libraries ready: ${allReady ? 'YES' : 'NO'}`);
+      
+      return { allReady, missing, available: checks.filter(check => check.available) };
+    }
+
+    // Loading indicator management
+    function showLoadingIndicator() {
+      const indicator = document.getElementById('loading-indicator');
+      if (indicator) indicator.style.display = 'flex';
+    }
+
+    function hideLoadingIndicator() {
+      const indicator = document.getElementById('loading-indicator');
+      if (indicator) indicator.style.display = 'none';
+    }
+
+    // Error display management
+    function showError(message) {
+      const errorDiv = document.getElementById('error-display');
+      const errorMessage = document.getElementById('error-message');
+      if (errorDiv && errorMessage) {
+        errorMessage.textContent = message;
+        errorDiv.style.display = 'block';
+      }
+    }
+
+    function hideError() {
+      const errorDiv = document.getElementById('error-display');
+      if (errorDiv) errorDiv.style.display = 'none';
+    }
+
+    // Retry function for manual retry
+    function retryGraphInitialization() {
+      hideError();
+      retryCount = 0;
+      isGraphInitialized = false;
+      initializeWithRetry();
+    }
 
     // Console functionality
     let isConsoleVisible = true;
@@ -624,8 +798,6 @@
       toggleButton.innerHTML = '👁️';
       toggleButton.title = 'Show Console';
     }
-
-    // Minimize functionality removed - only hide/show console
 
     function setupDragFunctionality() {
       const consoleWindow = document.getElementById('console-window');
@@ -708,7 +880,7 @@
           createTestGraph();
           break;
         case 'init':
-        loadExternalGraph();
+          loadExternalGraph();
           break;
         case 'theme':
           toggleTheme();
@@ -718,6 +890,12 @@
           break;
         case 'status':
           showStatus();
+          break;
+        case 'debug':
+          showDebugInfo();
+          break;
+        case 'retry':
+          retryGraphInitialization();
           break;
         default:
           addLogEntry(`Unknown command: "${command}". Type "help" for available commands.`, 'error');
@@ -732,11 +910,19 @@
       addLogEntry('  • theme - Toggle between Matrix and Regular themes', 'info');
       addLogEntry('  • clear - Clear console log', 'info');
       addLogEntry('  • status - Show system status', 'info');
+      addLogEntry('  • debug - Show debug information', 'info');
+      addLogEntry('  • retry - Retry graph initialization', 'info');
     }
 
     function createTestGraph() {
       try {
         addLogEntry('🧪 Creating test graph...', 'info');
+        showLoadingIndicator();
+        
+        // Check WebGL support
+        if (!checkWebGLSupport()) {
+          throw new Error('WebGL not supported or context lost');
+        }
         
         // Simple test data
         const testData = {
@@ -754,6 +940,7 @@
         const graphElement = document.getElementById('graph');
         graphElement.innerHTML = '';
         
+        // Create graph with error handling
         const Graph = window.ForceGraph3D()(graphElement)
           .graphData(testData)
           .backgroundColor('#000000')
@@ -762,12 +949,103 @@
           .nodeLabel('name')
           .onNodeClick(node => {
             addLogEntry(`🖱️ Node clicked: ${node.name}`, 'info');
+          })
+          .onEngineStop(() => {
+            addLogEntry('🎯 Graph layout stabilized', 'success');
+            hideLoadingIndicator();
           });
+
+        // Store graph instance
+        graphInstance = Graph;
+        
+        // Add WebGL context lost handler
+        const canvas = graphElement.querySelector('canvas');
+        if (canvas) {
+          canvas.addEventListener('webglcontextlost', function(e) {
+            e.preventDefault();
+            addLogEntry('❌ WebGL context lost', 'error');
+            showError('WebGL context lost. Tap retry to recover.');
+          });
+          
+          canvas.addEventListener('webglcontextrestored', function(e) {
+            addLogEntry('✅ WebGL context restored', 'success');
+            hideError();
+          });
+        }
 
         addLogEntry('✅ Test graph created successfully', 'success');
         
       } catch (error) {
+        hideLoadingIndicator();
         addLogEntry(`❌ Failed to create test graph: ${error.message}`, 'error');
+        showError('Failed to create graph: ' + error.message);
+      }
+    }
+
+    // WebGL support check
+    function checkWebGLSupport() {
+      try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!context) {
+          const errorMessage = 'WebGL not supported on this device';
+          addLogEntry('❌ WebGL not supported', 'error');
+          
+          // Notify React Native of WebGL error
+          if (window.ReactNativeWebView) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'webgl_error',
+                error: errorMessage
+              }));
+            } catch (e) {
+              console.error('Failed to send WebGL error to React Native:', e);
+            }
+          }
+          
+          return false;
+        }
+        
+        // Check for context loss
+        if (context.isContextLost && context.isContextLost()) {
+          const errorMessage = 'WebGL context is lost';
+          addLogEntry('❌ WebGL context is lost', 'error');
+          
+          // Notify React Native of WebGL context loss
+          if (window.ReactNativeWebView) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'webgl_error',
+                error: errorMessage
+              }));
+            } catch (e) {
+              console.error('Failed to send WebGL error to React Native:', e);
+            }
+          }
+          
+          return false;
+        }
+        
+        addLogEntry('✅ WebGL support confirmed', 'success');
+        return true;
+      } catch (e) {
+        const errorMessage = `WebGL check failed: ${e.message}`;
+        addLogEntry(`❌ ${errorMessage}`, 'error');
+        
+        // Notify React Native of WebGL error
+        if (window.ReactNativeWebView) {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'webgl_error',
+              error: errorMessage
+            }));
+          } catch (e) {
+            console.error('Failed to send WebGL error to React Native:', e);
+          }
+        }
+        
+        return false;
       }
     }
 
@@ -812,7 +1090,47 @@
     function showStatus() {
       addLogEntry('📊 System Status:', 'info');
       addLogEntry(`  • Theme: ${document.body.classList.contains('regular-theme') ? 'Regular' : 'Matrix'}`, 'info');
-      addLogEntry(`  • Libraries: THREE.js ${typeof window.THREE !== 'undefined' ? '✅' : '❌'}, ForceGraph3D ${typeof window.ForceGraph3D !== 'undefined' ? '✅' : '❌'}`, 'info');
+      addLogEntry(`  • Graph Initialized: ${isGraphInitialized ? 'YES' : 'NO'}`, 'info');
+      addLogEntry(`  • Retry Count: ${retryCount}/${MAX_RETRIES}`, 'info');
+      addLogEntry(`  • WebGL Support: ${checkWebGLSupport() ? 'YES' : 'NO'}`, 'info');
+      
+      const libraryStatus = checkLibrariesWithDetails();
+      addLogEntry(`  • Libraries: ${libraryStatus.allReady ? 'All Ready' : 'Missing: ' + libraryStatus.missing.join(', ')}`, libraryStatus.allReady ? 'success' : 'error');
+    }
+
+    function showDebugInfo() {
+      addLogEntry('🔍 Debug Information:', 'info');
+      addLogEntry(`  • User Agent: ${navigator.userAgent}`, 'info');
+      addLogEntry(`  • Platform: ${navigator.platform}`, 'info');
+      addLogEntry(`  • Screen: ${window.screen.width}x${window.screen.height}`, 'info');
+      addLogEntry(`  • Viewport: ${window.innerWidth}x${window.innerHeight}`, 'info');
+      addLogEntry(`  • Device Pixel Ratio: ${window.devicePixelRatio}`, 'info');
+      addLogEntry(`  • WebGL Vendor: ${getWebGLInfo().vendor}`, 'info');
+      addLogEntry(`  • WebGL Renderer: ${getWebGLInfo().renderer}`, 'info');
+    }
+
+    function getWebGLInfo() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) return { vendor: 'N/A', renderer: 'N/A' };
+        
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          return {
+            vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+            renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+          };
+        }
+        
+        return {
+          vendor: gl.getParameter(gl.VENDOR),
+          renderer: gl.getParameter(gl.RENDERER)
+        };
+      } catch (e) {
+        return { vendor: 'Error', renderer: e.message };
+      }
     }
 
     function addLogEntry(message, level = 'info') {
@@ -855,8 +1173,14 @@
             break;
             
           case 'loadGraphData':
-            // Handle graph data loading
+            // Handle graph data loading with error handling
             addLogEntry('📊 Received graph data from React Native', 'success');
+            try {
+              loadGraphWithData(message.data);
+            } catch (error) {
+              addLogEntry(`❌ Failed to load graph data: ${error.message}`, 'error');
+              showError('Failed to load graph data: ' + error.message);
+            }
             break;
             
           case 'clearGraph':
@@ -869,8 +1193,118 @@
         }
       } catch (error) {
         console.error('Failed to handle React Native message:', error);
+        addLogEntry(`❌ Message handling error: ${error.message}`, 'error');
       }
     });
+
+    // Load graph with actual data
+    function loadGraphWithData(data) {
+      if (!data || !data.entities || !data.relations) {
+        throw new Error('Invalid graph data format');
+      }
+      
+      showLoadingIndicator();
+      addLogEntry('🔄 Loading graph with actual data...', 'info');
+      
+      // Check WebGL support first
+      if (!checkWebGLSupport()) {
+        throw new Error('WebGL not supported or context lost');
+      }
+      
+      // Transform data for 3D Force Graph
+      const transformedData = {
+        nodes: data.entities.map(entity => ({
+          id: entity.name,
+          name: entity.name,
+          type: entity.type,
+          val: Math.min(entity.observations.length * 2 + 5, 20),
+          observations: entity.observations
+        })),
+        links: data.relations.map(relation => ({
+          source: relation.source,
+          target: relation.target,
+          relationType: relation.relationType
+        }))
+      };
+      
+      const graphElement = document.getElementById('graph');
+      graphElement.innerHTML = '';
+      
+      // Create graph with comprehensive error handling
+      const Graph = window.ForceGraph3D()(graphElement)
+        .graphData(transformedData)
+        .backgroundColor('#000000')
+        .nodeColor(node => getNodeColor(node.type))
+        .linkColor(() => '#004d1a')
+        .nodeLabel(node => `${node.name} (${node.type})`)
+        .onNodeClick(node => {
+          addLogEntry(`🖱️ Node clicked: ${node.name} (${node.type})`, 'info');
+          
+          // Send node click to React Native
+          if (window.ReactNativeWebView) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'nodeClicked',
+                node: node,
+                allData: data
+              }));
+            } catch (e) {
+              addLogEntry(`❌ Failed to send node click: ${e.message}`, 'error');
+            }
+          }
+        })
+        .onEngineStop(() => {
+          addLogEntry('🎯 Graph layout stabilized', 'success');
+          hideLoadingIndicator();
+        });
+
+      // Store graph instance
+      graphInstance = Graph;
+      
+      // Add WebGL context handlers
+      const canvas = graphElement.querySelector('canvas');
+      if (canvas) {
+        canvas.addEventListener('webglcontextlost', function(e) {
+          e.preventDefault();
+          addLogEntry('❌ WebGL context lost during graph rendering', 'error');
+          showError('WebGL context lost. Graph may need to be reloaded.');
+        });
+        
+        canvas.addEventListener('webglcontextrestored', function(e) {
+          addLogEntry('✅ WebGL context restored', 'success');
+          hideError();
+          // Attempt to reload graph
+          setTimeout(() => {
+            try {
+              loadGraphWithData(data);
+            } catch (error) {
+              addLogEntry(`❌ Failed to reload graph after context restore: ${error.message}`, 'error');
+            }
+          }, 1000);
+        });
+      }
+      
+      addLogEntry(`✅ Graph loaded successfully with ${transformedData.nodes.length} nodes and ${transformedData.links.length} links`, 'success');
+    }
+
+    // Node color mapping
+    function getNodeColor(nodeType) {
+      const nodeColors = {
+        'Project': '#00FF41',
+        'Bug Fix': '#FF4444',
+        'Feature': '#00DD35',
+        'Component': '#00BB29',
+        'Architecture': '#44FF44',
+        'Infrastructure': '#00AA22',
+        'Strategy': '#FFAA00',
+        'Problem Analysis': '#FF6666',
+        'Feature Implementation': '#00CC30',
+        'Architecture Strategy': '#44CCFF',
+        'default': '#00FF41'
+      };
+      
+      return nodeColors[nodeType] || nodeColors.default;
+    }
 
     console.log('🔧 Neron Graph Engine script loaded successfully');
   </script>

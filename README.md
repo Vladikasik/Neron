@@ -1,186 +1,183 @@
-# Neron Graph Visualization
+# NeronGraphViz
 
-A React Native app with Expo that visualizes Neo4j graph data using the `react-force-graph` library with Bloom Post-Processing Effects.
+A React Native application for visualizing Neo4j graph data with 3D interactive graphics.
 
-## 🌟 Features
+## Features
 
-- **Real `react-force-graph`**: Uses the actual `react-force-graph-3d` library running in a WebView
-- **Bloom Post-Processing Effect**: Stunning visual effects with ThreeJS UnrealBloomPass
-- **Neo4j Data Support**: Directly imports and visualizes Neo4j JSON exports
-- **Interactive Nodes & Links**: Click on nodes and relationships to see details
-- **Production Ready**: Clean architecture with proper error handling
-- **Cross Platform**: Works on iOS, Android, and Web
+- 3D force-directed graph visualization
+- Interactive node exploration
+- Theme switching (Matrix/Regular)
+- Cross-platform support (iOS, Android, Web)
+- Neo4j data integration
 
-## 🚀 Quick Start
+## Installation
 
-### Prerequisites
-
-- Node.js (v16 or higher)
-- Expo CLI (`npm install -g @expo/cli`)
-- iOS Simulator / Android Emulator / Physical device
-
-### Installation
-
-1. **Clone and setup the project**:
-   ```bash
-   cd NeronGraphViz
-   npm install
-   ```
-
-2. **Start the development server**:
-   ```bash
-   npx expo start
-   ```
-
-3. **Run on your preferred platform**:
-   - Press `i` for iOS Simulator
-   - Press `a` for Android Emulator
-   - Scan QR code with Expo Go app on your device
-
-## 📊 Data Format
-
-The app expects Neo4j data in the following JSON format (see `assets/test.json`):
-
-```json
-{
-  "entities": [
-    {
-      "name": "unique-entity-name",
-      "type": "entity-type",
-      "observations": ["observation1", "observation2"]
-    }
-  ],
-  "relations": [
-    {
-      "source": "source-entity-name",
-      "target": "target-entity-name", 
-      "relationType": "relationship-type"
-    }
-  ]
-}
+```bash
+npm install
 ```
 
-### How to Use Your Own Data
+## Running the App
 
-1. **Export from Neo4j**: Replace `assets/test.json` with your own Neo4j export
-2. **Format Requirements**:
-   - Must have `entities` and `relations` arrays
-   - Each entity needs `name`, `type`, and `observations`
-   - Each relation needs `source`, `target`, and `relationType`
-3. **Restart the app** to load the new data
+```bash
+# Start the development server
+npm start
 
-## 🎨 Visualization Features
+# Run on iOS
+npm run ios
 
-### Node Styling
-- **Size**: Based on number of observations
-- **Color**: Automatically assigned by entity type
-- **Labels**: Show entity name and type on hover
+# Run on Android
+npm run android
 
-### Link Styling  
-- **Directional**: Shows relationships between entities
-- **Interactive**: Click to see relationship details
-- **Styled**: Semi-transparent with connection indicators
+# Run on Web
+npm run web
+```
 
-### Bloom Effect
-- **Post-Processing**: Real-time UnrealBloomPass from ThreeJS
-- **Strength**: 4 (intense glow)
-- **Radius**: 1 (medium spread)
-- **Threshold**: 0 (affects all elements)
+## iOS WebView Troubleshooting
 
-## 🏗️ Architecture
+This app uses WebView to render 3D graphics, which can encounter issues on iOS devices. Here's how to diagnose and resolve common problems:
 
-### WebView Approach
-This app uses a hybrid architecture:
+### Common iOS Issues
 
-1. **React Native**: Main app shell, navigation, data loading
-2. **WebView**: Embedded HTML page running `react-force-graph`
-3. **Communication**: Bidirectional message passing between RN and WebView
+1. **WebGL Context Lost**: iOS WebView has known issues with WebGL context loss, especially on newer iOS versions (16.4+, 17+, 18+)
+2. **External Script Loading**: iOS WebView blocks external CDN scripts by default
+3. **Memory Limitations**: iOS devices have stricter memory limits for WebView applications
+4. **Graphics Performance**: iOS WebView has reduced performance for complex 3D graphics
 
-### Key Components
+### Solutions Implemented
 
-- `GraphVisualization.tsx`: WebView wrapper with communication
-- `useGraphData.ts`: Data loading and management hook
-- `dataTransformer.ts`: Neo4j to react-force-graph data conversion
-- `graph-viewer.html`: Web page with react-force-graph implementation
+#### 1. CDN Script Loading
+- **Problem**: Initially thought iOS WebView blocks external CDN scripts
+- **Solution**: CDN scripts actually work fine on iOS WebView when properly configured
+- **Implementation**: Uses unpkg.com CDN for THREE.js and 3D Force Graph libraries
+- **Advantage**: Always gets latest compatible versions without local bundling complexity
 
-### Why WebView?
+#### 2. Enhanced Error Handling
+- **WebGL Error Detection**: Automatic detection of WebGL support and context loss
+- **Retry Mechanism**: Automatic retry with exponential backoff (max 3 attempts)
+- **Graceful Fallback**: Console remains functional even if graphics fail
+- **User Feedback**: Clear error messages and retry options
 
-`react-force-graph` is designed for web browsers and uses:
-- HTML Canvas / WebGL
-- DOM manipulation
-- Browser-specific APIs
-
-Since React Native doesn't have these APIs, WebView is the most practical solution to use the library exactly as intended.
-
-## 🛠️ Development
-
-### Adding New Features
-
-1. **WebView Side** (HTML): Edit `assets/graph-viewer.html`
-   - Add new react-force-graph props
-   - Implement new visual effects
-   - Handle new interaction events
-
-2. **React Native Side**: Edit components in `src/`
-   - Add UI controls
-   - Implement data filtering
-   - Add new screens/navigation
-
-### Communication Protocol
-
-Messages between React Native and WebView:
-
+#### 3. iOS-Specific WebView Configuration
 ```typescript
-// React Native → WebView
-{
-  type: 'GRAPH_DATA',
-  payload: Neo4jData
-}
-
-// WebView → React Native  
-{
-  type: 'NODE_CLICK' | 'LINK_CLICK' | 'READY',
-  payload: any
-}
+// Enhanced WebView props for iOS compatibility
+allowsInlineMediaPlayback={true}
+bounces={false}
+scrollEnabled={false}
+allowsBackForwardNavigationGestures={false}
+dataDetectorTypes="none"
+fraudulentWebsiteWarningEnabled={false}
+limitsNavigationsToAppBoundDomains={false}
 ```
 
-## 📱 Platform Support
+#### 4. WebGL Context Recovery
+- **Context Loss Handlers**: Automatic detection and recovery from WebGL context loss
+- **State Preservation**: Graph state is preserved during context recovery
+- **Progressive Enhancement**: Features degrade gracefully on unsupported devices
 
-- ✅ **iOS**: Full support with WebView
-- ✅ **Android**: Full support with WebView  
-- ✅ **Web**: Runs in browser via Expo Web
-- ❌ **Desktop**: Not supported (Expo limitation)
+### Debugging iOS Issues
 
-## 🐛 Troubleshooting
+#### Using the Built-in Console
 
-### WebView Not Loading
-- Check console for JavaScript errors
-- Ensure `assets/graph-viewer.html` exists
-- Verify internet connection (loads libraries from CDN)
+1. **Open the Console**: Tap the ⚡ button in the bottom-left corner
+2. **Check Status**: Type `status` to see system information
+3. **Debug Information**: Type `debug` to see detailed device information
+4. **Test Graphics**: Type `test` to create a simple test graph
+5. **Retry Failed Graphics**: Type `retry` to retry graph initialization
 
-### Data Not Showing
-- Validate JSON format in `assets/test.json`
-- Check React Native logs for parsing errors
-- Ensure entities and relations arrays exist
+#### Console Commands
 
-### Performance Issues
-- Large graphs (>1000 nodes) may be slow
-- Consider data filtering/pagination for better performance
-- Adjust force simulation parameters in HTML file
+| Command | Description |
+|---------|-------------|
+| `help` | Show all available commands |
+| `status` | Display system status and library availability |
+| `debug` | Show detailed device and WebGL information |
+| `test` | Create a simple test graph to verify graphics work |
+| `retry` | Retry graph initialization if it failed |
+| `clear` | Clear console log |
+| `theme` | Switch between Matrix and Regular themes |
 
-## 🎯 Use Cases
+#### Common Error Messages
 
-Perfect for visualizing:
-- **Knowledge Graphs**: Documentation, notes, concept maps
-- **Project Dependencies**: Code relationships, component hierarchies  
-- **Social Networks**: User connections, interaction patterns
-- **Data Lineage**: Database relationships, data flow
-- **Process Maps**: Workflow visualization, decision trees
+**"WebGL not supported"**
+- Device doesn't support WebGL
+- Try restarting the app
+- Check if device supports 3D graphics
 
-## 📄 License
+**"WebGL context lost"**
+- iOS WebGL context was lost (common issue)
+- Tap "Retry" or use console command `retry`
+- Try closing other apps to free memory
 
-MIT License - feel free to use this project as a base for your own graph visualizations!
+**"Libraries not ready"**
+- Local JavaScript libraries failed to load
+- Check internet connection (for initial download)
+- Restart the app
 
-## 🤝 Contributing
+**"Failed to initialize after multiple attempts"**
+- Device may not support complex 3D graphics
+- Graphics will be disabled, console remains available
+- Consider using web version for full functionality
 
-Contributions welcome! This project demonstrates a practical approach to using web-based visualization libraries in React Native apps. 
+### Performance Optimization for iOS
+
+#### Memory Management
+- Graph is optimized for mobile devices
+- Node count is limited to prevent memory issues
+- Automatic cleanup of unused resources
+
+#### Graphics Optimization
+- Reduced particle effects on mobile
+- Simplified shaders for better compatibility
+- Hardware acceleration when available
+
+#### Progressive Enhancement
+- Core functionality works without 3D graphics
+- Console provides full debugging capabilities
+- Graceful degradation on older devices
+
+### Device Compatibility
+
+#### Fully Supported
+- iPhone 12 and newer
+- iPad Pro (2020 and newer)
+- iOS 15.0 and newer
+
+#### Limited Support
+- iPhone X to iPhone 11 series
+- iPad Air 3rd generation and newer
+- iOS 14.0 - 14.9
+
+#### Basic Support (Console Only)
+- iPhone 8 and older
+- iPad 6th generation and older
+- iOS 13.0 and older
+
+### Troubleshooting Steps
+
+1. **Check Console Logs**
+   - Open console and look for error messages
+   - Use `debug` command to see device information
+
+2. **Verify WebGL Support**
+   - Use `status` command to check WebGL availability
+   - Try `test` command to create simple graph
+
+3. **Restart and Retry**
+   - Close and reopen the app
+   - Use `retry` command in console
+   - Restart iOS device if issues persist
+
+4. **Alternative Solutions**
+   - Use web version if iOS issues persist
+   - Consider updating iOS to latest version
+   - Free up device memory by closing other apps
+
+### Development Notes
+
+- JavaScript libraries loaded from CDN (unpkg.com) for best compatibility
+- Comprehensive error handling with React Native communication
+- Automatic fallback systems for unsupported devices
+- Real-time debugging through integrated console
+- iOS WebView supports external scripts when properly configured
+
+For additional support or to report iOS-specific issues, please check the console logs and include device information when reporting bugs. 
